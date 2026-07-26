@@ -1,59 +1,68 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-GitHub Models / Azure 专属适配层
+GitHub Models 公共版 原生 HTTP 适配层
 ===================================
 
-解决 GitHub Models (Azure AI Inference) 的以下问题：
-  1. Azure 接口非标准 /v1 路径兼容
-  2. api-version 请求头缺失
-  3. 原生 LiteLLM 在某些环境下路由失败
-  4. 免费模型 RPM 限流控制
-  5. 错误重试 + 优雅降级
+**彻底根治 LiteLLM azure/ 路由 302 网页跳转解析失败**
 
-支持模型：GPT-4o, GPT-4o-mini, Claude 3.5 Sonnet, Claude 3 Haiku,
-         Gemini 2.0 Flash, DeepSeek R1/V3, Llama 3.3 70B, Codestral, Phi-4
+根因：GitHub Models 是微软公开免费模型，不走标准 Azure 商用资源池逻辑。
+     LiteLLM 原生 azure/ 路由会触发 302 重定向 → 返回网页 HTML → 解析失败。
+
+修复方案：
+  1. 完全弃用 LiteLLM azure/ 路由
+  2. 使用 GitHub Models 官方原生 POST 接口
+  3. 不带 api-version 头（公共版不需要，带参数反而 302）
+  4. 精确模型名映射（匹配 GitHub 官方路由）
 
 使用方式：
     from src.llm.azure_github_adapter import GitHubAzureAdapter
     client = GitHubAzureAdapter(token="ghp_xxx")
-    result = client.completion(model="gpt-4o", messages=[...])
+    resp = client.completion(model="gpt-4o", messages=[...])
+    content = resp["choices"][0]["message"]["content"]
 """
 
 from __future__ import annotations
 
 import logging
 import time
+import traceback
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class GitHubAzureAdapter:
-    """GitHub Models Azure AI Inference 适配器。
+    """GitHub Models 公共版原生 HTTP 适配器。
 
-    特性：
-    - 自动补全 Azure 所需 api-version header
-    - 双层调用：优先 LiteLLM，失败降级到 requests 直连
-    - 内置 RPM 限流（默认 15 RPM）
-    - 指数退避重试
+    已移除所有 LiteLLM Azure 兼容逻辑。
+    直接调用 GitHub Models 官方 REST API。
     """
 
-    API_VERSION = "2024-05-01-preview"
-    BASE_URL = "https://models.inference.ai.azure.com"
+    # GitHub Models 公共版官方接口（非商用 Azure 资源池）
+    BASE_URL = "https://models.inference.ai.azure.com/chat/completions"
 
-    # 已知可用的完整模型名映射（API 实际接受的名）
-    _KNOWN_MODEL_NAMES = {
+    # 官方精确模型名映射（必选——名称不一致直接 404）
+    _OFFICIAL_MODEL_NAMES = {
+        # OpenAI
         "gpt-4o": "gpt-4o",
         "gpt-4o-mini": "gpt-4o-mini",
-        "claude-3.5-sonnet": "claude-3.5-sonnet",
-        "claude-3-haiku": "claude-3-haiku",
-        "gemini-2.0-flash": "gemini-2.0-flash",
+        # Anthropic — GitHub 官方路由使用带日期的版本名
+        "claude-3.5-sonnet": "claude-3-5-sonnet-20240620",
+        "claude-3-haiku": "claude-3-5-haiku-20241022",
+        # Google
+        "gemini-2.0-flash": "gemini-2.0-flash-001",
+        # DeepSeek
         "deepseek-r1": "deepseek-r1",
         "deepseek-v3": "deepseek-v3",
-        "llama-3.3-70b": "llama-3.3-70b",
-        "codestral": "codestral",
+        # Meta
+        "llama-3.3-70b": "llama-3.3-70b-instruct",
+        # Mistral
+        "codestral": "codestral-2501",
+        # Microsoft
         "phi-4": "phi-4",
+        # xAI
+        "grok-3": "grok-3-preview",
     }
 
     def __init__(
@@ -61,55 +70,52 @@ class GitHubAzureAdapter:
         token: str = "",
         rpm_limit: int = 15,
         timeout: int = 60,
-        max_retries: int = 2,
     ):
         self._token = token
         self._enabled = bool(token)
 
-        # Azure 标准请求头
+        # 不带 api-version 的纯净请求头（公共版不需要，带参数反而 302）
         self._headers = {
             "Authorization": f"Bearer {self._token}",
             "Content-Type": "application/json",
-            "api-version": self.API_VERSION,
         }
 
-        # 限流控制
         self._rpm_limit = rpm_limit
-        self._request_timestamps: List[float] = []
-
-        # 重试配置
         self._timeout = timeout
-        self._max_retries = max_retries
+        self._last_request_time: float = 0.0
 
-        # 熔断状态（简单版，配合 rate_limiter.CircuitBreaker 使用）
-        self._cooldown_until: Dict[str, float] = {}
+        # 模型黑名单：连续失败 3 次自动剔除
+        self._blacklist: Dict[str, float] = {}  # model → 解封时间
         self._error_counts: Dict[str, int] = {}
+        self._blacklist_threshold = 3
+        self._blacklist_cooldown = 60.0  # 60 秒后重试
+
+        # 统计
+        self._total_requests = 0
+        self._total_success = 0
 
     @property
     def enabled(self) -> bool:
         return self._enabled
 
-    # ---- 限流 ----
+    # ============================================================
+    # 限流
+    # ============================================================
 
-    def _rate_limit_wait(self):
-        """滑动窗口 RPM 限流（60 秒窗口）"""
+    def _rate_limit_control(self):
+        """精准 RPM 控频：确保每秒不超过 rpm/60 次"""
         now = time.time()
-        # 清理 60 秒前的记录
-        self._request_timestamps = [
-            t for t in self._request_timestamps if now - t < 60
-        ]
-        if len(self._request_timestamps) >= self._rpm_limit:
-            # 等待最早记录过期 + 小 buffer
-            wait = 60 - (now - self._request_timestamps[0]) + 0.5
-            if wait > 0:
-                logger.debug(
-                    f"[AzureAdapter] RPM 限流等待 {wait:.1f}s "
-                    f"({len(self._request_timestamps)}/{self._rpm_limit} requests)"
-                )
-                time.sleep(wait)
-        self._request_timestamps.append(time.time())
+        interval = 60.0 / self._rpm_limit
+        elapsed = now - self._last_request_time
+        if elapsed < interval:
+            wait = interval - elapsed
+            logger.debug(f"[AzureAdapter] RPM 限速等待 {wait:.1f}s")
+            time.sleep(wait)
+        self._last_request_time = time.time()
 
-    # ---- 核心调用 ----
+    # ============================================================
+    # 核心——纯原生 HTTP（无 LiteLLM）
+    # ============================================================
 
     def completion(
         self,
@@ -119,180 +125,203 @@ class GitHubAzureAdapter:
         max_tokens: int = 2048,
         timeout: Optional[int] = None,
     ) -> Optional[Dict[str, Any]]:
-        """兼容 GitHub Models / Azure 接口的通用推理方法。
+        """原生 HTTP POST 调用 GitHub Models 公共 API。
+
+        完全绕过 LiteLLM，直接 HTTP，杜绝 302 网页跳转。
 
         Args:
-            model: 模型名（无需 azure/ 前缀）
+            model: 简短模型名（如 "gpt-4o", "claude-3.5-sonnet"）
             messages: OpenAI 格式消息列表
-            temperature: 温度参数
-            max_tokens: 最大输出 tokens
+            temperature: 温度
+            max_tokens: 最大输出 token
             timeout: 超时秒数
 
         Returns:
-            {"content": str, "model": str, "usage": dict} 或 None
+            成功时返回原始 API JSON: {"choices": [{"message": {"content": "..."}}], ...}
+            失败时返回 None
         """
         if not self._enabled:
             logger.warning("[AzureAdapter] Token 未配置，跳过调用")
             return None
 
-        # 模型名标准化
-        model = self._normalize_model(model)
+        # 1. 精确模型名映射
+        clean_model = self._normalize_model(model)
+        api_model = self._OFFICIAL_MODEL_NAMES.get(clean_model, clean_model)
 
-        # 熔断检查
-        if self._is_cooldown(model):
-            logger.warning(f"[AzureAdapter] {model} 处于熔断冷却期，跳过")
-            return None
-
-        # 限流
-        self._rate_limit_wait()
-
-        t = timeout or self._timeout
-
-        # 方法 1: 优先 LiteLLM（完整支持）
-        result = self._try_litellm(model, messages, temperature, max_tokens, t)
-        if result is not None:
-            self._mark_success(model)
-            return result
-
-        # 方法 2: 降级到 requests 直连
-        logger.info(f"[AzureAdapter] LiteLLM 调用失败，降级到 requests 直连: {model}")
-        result = self._try_direct_http(model, messages, temperature, max_tokens, t)
-        if result is not None:
-            self._mark_success(model)
-            return result
-
-        # 全部失败
-        self._mark_failure(model)
-        return None
-
-    def _try_litellm(
-        self, model: str, messages: List[Dict], temperature: float,
-        max_tokens: int, timeout: int,
-    ) -> Optional[Dict[str, Any]]:
-        """通过 LiteLLM 调用（首选）"""
-        try:
-            import litellm
-
-            response = litellm.completion(
-                model=f"github/{model}",
-                messages=messages,
-                api_key=self._token,
-                api_base=self.BASE_URL,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                timeout=timeout,
-                custom_llm_provider="openai",
+        # 2. 黑名单检查
+        if self._is_blacklisted(clean_model):
+            logger.warning(
+                f"[AzureAdapter] {clean_model} 在黑名单中，跳过本次调用"
             )
-            content = response.choices[0].message.content
-            return {
-                "content": content,
-                "model": model,
-                "usage": getattr(response, "usage", None),
-                "source": "litellm",
-            }
-        except Exception as e:
-            logger.debug(f"[AzureAdapter] LiteLLM {model} 失败: {type(e).__name__}: {str(e)[:150]}")
             return None
 
-    def _try_direct_http(
-        self, model: str, messages: List[Dict], temperature: float,
-        max_tokens: int, timeout: int,
-    ) -> Optional[Dict[str, Any]]:
-        """通过 requests 直连 Azure API（降级方案）"""
+        # 3. 限流
+        self._rate_limit_control()
+
+        # 4. 原生 HTTP POST（无 LiteLLM，无 api-version）
+        payload = {
+            "model": api_model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+
         try:
             import requests
 
-            url = f"{self.BASE_URL}/chat/completions"
-            payload = {
-                "model": model,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            }
+            self._total_requests += 1
             resp = requests.post(
-                url,
+                self.BASE_URL,
                 headers=self._headers,
                 json=payload,
-                timeout=timeout,
+                timeout=timeout or self._timeout,
             )
-            if resp.status_code == 200:
-                data = resp.json()
-                content = data["choices"][0]["message"]["content"]
-                return {
-                    "content": content,
-                    "model": model,
-                    "usage": data.get("usage"),
-                    "source": "direct_http",
-                }
-            elif resp.status_code == 429:
-                logger.warning(f"[AzureAdapter] {model} 429 限流，触发降级")
-                self._apply_rate_limit_backoff()
+
+            status = resp.status_code
+
+            if status == 200:
+                self._total_success += 1
+                self._mark_success(clean_model)
+                return resp.json()
+
+            elif status == 429:
+                # 限流 → 降低 RPM 并黑名单短暂冷却
+                logger.warning(
+                    f"[AzureAdapter] {api_model} 429 限流 | "
+                    f"RPM={self._rpm_limit}"
+                )
+                self._apply_rate_backoff()
+                self._mark_failure(clean_model)
                 return None
+
+            elif status in (302, 301):
+                # 重定向 → 模型名或路由错误
+                redirect_url = resp.headers.get("Location", "unknown")
+                logger.error(
+                    f"[AzureAdapter] {api_model} HTTP {status} 重定向 → {redirect_url} "
+                    f"| 模型名可能不匹配，请检查 _OFFICIAL_MODEL_NAMES"
+                )
+                self._mark_failure(clean_model)
+                return None
+
+            elif status == 404:
+                logger.error(
+                    f"[AzureAdapter] {api_model} HTTP 404 模型不存在 "
+                    f"| 请确认模型名 {api_model} 在 GitHub Models 中可用"
+                )
+                self._mark_failure(clean_model)
+                return None
+
             else:
                 logger.warning(
-                    f"[AzureAdapter] HTTP {resp.status_code}: "
+                    f"[AzureAdapter] {api_model} HTTP {status}: "
                     f"{resp.text[:300]}"
                 )
+                if status >= 500:
+                    self._mark_failure(clean_model)
                 return None
-        except Exception as e:
-            logger.debug(f"[AzureAdapter] Direct HTTP {model} 失败: {type(e).__name__}")
+
+        except requests.exceptions.Timeout:
+            logger.error(
+                f"[AzureAdapter] {api_model} 请求超时 ({timeout or self._timeout}s)"
+            )
+            self._mark_failure(clean_model)
             return None
 
-    # ---- 熔断 ----
-
-    def _is_cooldown(self, model: str) -> bool:
-        """检查模型是否在冷却期"""
-        until = self._cooldown_until.get(model, 0)
-        return time.time() < until
-
-    def _mark_success(self, model: str):
-        """标记调用成功，重置错误计数"""
-        self._error_counts.pop(model, None)
-
-    def _mark_failure(self, model: str):
-        """标记调用失败，累计错误数"""
-        count = self._error_counts.get(model, 0) + 1
-        self._error_counts[model] = count
-        if count >= 3:
-            # 3 次连续失败 → 60 秒冷却
-            self._cooldown_until[model] = time.time() + 60
-            logger.warning(
-                f"[AzureAdapter] {model} 连续失败 {count} 次，冷却 60s"
+        except requests.exceptions.ConnectionError as e:
+            logger.error(
+                f"[AzureAdapter] {api_model} 连接失败: {e}"
             )
+            self._mark_failure(clean_model)
+            return None
 
-    def _apply_rate_limit_backoff(self):
-        """遇到 429 后降低调用频率"""
-        old_limit = self._rpm_limit
-        self._rpm_limit = max(3, self._rpm_limit - 3)
-        logger.info(
-            f"[AzureAdapter] RPM 限流回退: {old_limit} → {self._rpm_limit}"
-        )
+        except Exception as e:
+            logger.error(
+                f"[AzureAdapter] {api_model} 未知异常: {type(e).__name__}: {e}\n"
+                f"{traceback.format_exc()}"
+            )
+            self._mark_failure(clean_model)
+            return None
 
-    # ---- 工具方法 ----
+    # ============================================================
+    # 模型名标准化
+    # ============================================================
 
     @staticmethod
     def _normalize_model(model: str) -> str:
-        """标准化模型名"""
+        """去除前缀，返回简短名"""
         model = model.strip()
-        # 移除常见前缀
         for prefix in ("github/", "azure/", "openai/"):
             if model.startswith(prefix):
                 model = model[len(prefix):]
         return model
 
     @classmethod
+    def get_api_model_name(cls, short_name: str) -> str:
+        """获取 API 实际使用的模型名"""
+        clean = cls._normalize_model(short_name)
+        return cls._OFFICIAL_MODEL_NAMES.get(clean, clean)
+
+    @classmethod
     def is_known_model(cls, model: str) -> bool:
-        """检查是否为已知可用模型"""
-        return cls._normalize_model(model) in cls._KNOWN_MODEL_NAMES
+        return cls._normalize_model(model) in cls._OFFICIAL_MODEL_NAMES
 
     @classmethod
     def get_known_models(cls) -> List[str]:
-        """返回所有已知模型名"""
-        return list(cls._KNOWN_MODEL_NAMES.keys())
+        return list(cls._OFFICIAL_MODEL_NAMES.keys())
+
+    # ============================================================
+    # 黑名单管理
+    # ============================================================
+
+    def _is_blacklisted(self, model: str) -> bool:
+        until = self._blacklist.get(model, 0)
+        return time.time() < until
+
+    def _mark_success(self, model: str):
+        self._error_counts.pop(model, None)
+        self._blacklist.pop(model, None)
+
+    def _mark_failure(self, model: str):
+        count = self._error_counts.get(model, 0) + 1
+        self._error_counts[model] = count
+        if count >= self._blacklist_threshold:
+            self._blacklist[model] = time.time() + self._blacklist_cooldown
+            logger.warning(
+                f"[AzureAdapter] {model} 连续失败 {count} 次 → "
+                f"加入黑名单 {self._blacklist_cooldown}s"
+            )
+
+    def _apply_rate_backoff(self):
+        old = self._rpm_limit
+        self._rpm_limit = max(3, self._rpm_limit - 3)
+        logger.info(
+            f"[AzureAdapter] RPM 回退: {old} → {self._rpm_limit}"
+        )
+
+    # ============================================================
+    # 统计与诊断
+    # ============================================================
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "total_requests": self._total_requests,
+            "total_success": self._total_success,
+            "success_rate": (
+                self._total_success / max(self._total_requests, 1)
+            ),
+            "current_rpm": self._rpm_limit,
+            "blacklisted": {
+                m: round(until - time.time(), 1)
+                for m, until in self._blacklist.items()
+                if time.time() < until
+            },
+            "error_counts": dict(self._error_counts),
+        }
 
 
 # ============================================================
-# 全局单例（可选，推荐用 free_model_hub 管理生命周期）
+# 全局单例
 # ============================================================
 
 _github_azure_client: Optional[GitHubAzureAdapter] = None
@@ -301,7 +330,6 @@ _github_azure_client: Optional[GitHubAzureAdapter] = None
 def get_github_azure_adapter(
     token: str = "", rpm_limit: int = 15,
 ) -> GitHubAzureAdapter:
-    """获取/创建全局 GitHubAzureAdapter 实例"""
     global _github_azure_client
     if _github_azure_client is None or token:
         _github_azure_client = GitHubAzureAdapter(token=token, rpm_limit=rpm_limit)

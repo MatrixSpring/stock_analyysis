@@ -495,56 +495,59 @@ class GitHubModelsProvider:
                 )
                 content = result.choices[0].message.content if hasattr(result, "choices") else str(result)
             else:
-                # 方法 1: LiteLLM（GitHub Models = Azure AI Inference）
                 content = None
+
+                # ---- 方法 1 (首选): Azure Adapter 原生 HTTP ----
+                # 彻底避开 LiteLLM azure/ 路由的 302 网页跳转 BUG
                 try:
-                    import litellm
-                    response = await litellm.acompletion(
+                    from src.llm.azure_github_adapter import GitHubAzureAdapter
+                    adapter = GitHubAzureAdapter(
+                        token=self._api_key, rpm_limit=15, timeout=self._timeout,
+                    )
+                    result = adapter.completion(
                         model=model,
                         messages=[{"role": "user", "content": full_prompt}],
-                        api_key=self._api_key,
-                        api_base=self._api_base,
                         temperature=self._temperature,
-                        timeout=self._timeout,
-                        max_retries=3,
-                        custom_llm_provider="openai",
                     )
-                    content = response.choices[0].message.content
+                    if result and "choices" in result:
+                        content = result["choices"][0]["message"]["content"]
+                        logger.debug(
+                            f"[GitHubModels] {model} Azure Adapter 原生 HTTP 成功"
+                        )
                 except ImportError:
-                    logger.debug(f"[GitHubModels] litellm not available for {model}")
+                    logger.debug("[GitHubModels] azure_github_adapter 不可用")
                 except Exception as e:
                     logger.debug(
-                        f"[GitHubModels] LiteLLM {model} 失败: "
-                        f"{type(e).__name__}: {str(e)[:150]}, 尝试 Azure Adapter 直连"
+                        f"[GitHubModels] Azure Adapter {model} 失败: "
+                        f"{type(e).__name__}: {str(e)[:150]}"
                     )
 
-                # 方法 2 (fallback): Azure GitHub Adapter 直连
+                # ---- 方法 2 (降级): LiteLLM ----
+                # 仅当 Azure Adapter 不可用或失败时尝试
                 if not content:
                     try:
-                        from src.llm.azure_github_adapter import GitHubAzureAdapter
-                        adapter = GitHubAzureAdapter(
-                            token=self._api_key, rpm_limit=15, timeout=self._timeout,
-                        )
-                        result = adapter.completion(
+                        import litellm
+                        response = await litellm.acompletion(
                             model=model,
                             messages=[{"role": "user", "content": full_prompt}],
+                            api_key=self._api_key,
+                            api_base=self._api_base,
                             temperature=self._temperature,
+                            timeout=self._timeout,
+                            max_retries=3,
+                            custom_llm_provider="openai",
                         )
-                        if result and result.get("content"):
-                            content = result["content"]
-                            logger.info(
-                                f"[GitHubModels] {model} Azure Adapter 直连成功 "
-                                f"(source={result.get('source', 'unknown')})"
-                            )
+                        content = response.choices[0].message.content
+                        logger.info(f"[GitHubModels] {model} LiteLLM 降级成功")
                     except ImportError:
-                        logger.debug("[GitHubModels] azure_github_adapter not available")
+                        logger.debug(f"[GitHubModels] litellm 不可用 for {model}")
                     except Exception as e:
-                        logger.debug(
-                            f"[GitHubModels] Azure Adapter {model} failed: "
+                        logger.warning(
+                            f"[GitHubModels] LiteLLM {model} 也失败了: "
                             f"{type(e).__name__}: {str(e)[:150]}"
                         )
 
-                # 方法 3 (last resort): 模拟降级
+                # ---- 方法 3 (最终兜底): 降级标记 ----
                 if not content:
                     content = f"[降级] {model} 所有调用路径均失败: {context[:50]}..."
 
