@@ -233,8 +233,12 @@ class QuantScoreEngine:
             else:
                 details["pe"] = f"PE={pe:.0f} 0"
 
-            # 2. 营收增速 (±10)
-            rev_growth = float(fund.get("revenue_growth") or 0)
+            # 2. 营收增速 (±10) — 优先 TTM 滚动年化，降级单季同比
+            rev_growth = float(
+                fund.get("revenue_ttm_growth")
+                or fund.get("revenue_growth")
+                or 0
+            )
             if rev_growth > 30:
                 score += 10
                 details["revenue"] = f"高增长({rev_growth:.0f}%) +10"
@@ -250,8 +254,12 @@ class QuantScoreEngine:
             else:
                 details["revenue"] = f"持平({rev_growth:.0f}%) 0"
 
-            # 3. 利润增速 (±10)
-            profit_g = float(fund.get("profit_growth") or 0)
+            # 3. 利润增速 (±10) — 优先 TTM 滚动年化，降级单季同比
+            profit_g = float(
+                fund.get("profit_ttm_growth")
+                or fund.get("profit_growth")
+                or 0
+            )
             if profit_g > 30:
                 score += 10
                 details["profit"] = f"利润高增({profit_g:.0f}%) +10"

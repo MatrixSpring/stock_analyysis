@@ -217,7 +217,11 @@ def _money_template() -> Dict[str, Any]:
 
 
 def _fund_template() -> Dict[str, Any]:
-    return {"pe": 30.0, "revenue_growth": 0.0, "profit_growth": 0.0}
+    return {
+        "pe": 30.0,
+        "revenue_growth": 0.0, "profit_growth": 0.0,
+        "revenue_ttm_growth": 0.0, "profit_ttm_growth": 0.0,
+    }
 
 
 # ============================================================
@@ -381,13 +385,18 @@ class StockDataLoader:
         try:
             close = df["close"].apply(self._safe_float)
             volume = df["volume"].apply(self._safe_float)
-            vol5 = volume.tail(5).mean()
+
+            # S2: 券商标准量比 = 今日成交量 / 前5日均量（不含今日）
+            vol_today = float(volume.iloc[-1])
+            vol_past5 = volume.iloc[-6:-1] if len(volume) >= 6 else volume.iloc[:-1]
+            vol_past5_avg = float(vol_past5.mean()) if len(vol_past5) > 0 else vol_today
+
             return {
                 "ma5": round(float(close.tail(5).mean()), 2),
                 "ma10": round(float(close.tail(10).mean()), 2),
                 "ma20": round(float(close.tail(20).mean()), 2),
                 "rsi": self.calc_safe_rsi(close),
-                "vol_ratio": round(float(volume.iloc[-1]) / float(vol5), 2) if vol5 > 0 else 1.0,
+                "vol_ratio": round(vol_today / vol_past5_avg, 2) if vol_past5_avg > 0 else 1.0,
                 "close": round(float(close.iloc[-1]), 2),
             }
         except Exception:
@@ -465,7 +474,15 @@ class StockDataLoader:
         return _fund_template()
 
     def _fund_from_akshare(self, code: str) -> Dict[str, Any]:
+        """基本面数据（S2: TTM 四季滚动年化 + 单季增速双口径）。
+
+        解决原单季度增速的季节性失真和年末结算偏差：
+          - revenue_ttm_growth / profit_ttm_growth: TTM 同比（对标同花顺口径）
+          - revenue_growth / profit_growth: 原单季同比（辅助参考）
+        """
         _, ak_code = self._normalize_code(code)
+
+        # PE
         pe = 30.0
         try:
             df_val = ak.stock_zh_a_valuation(symbol=ak_code, timeout=_REQUEST_TIMEOUT)
@@ -477,16 +494,66 @@ class StockDataLoader:
             pe = 30.0
 
         rev_g, profit_g = 0.0, 0.0
+        rev_ttm, profit_ttm = 0.0, 0.0
+
         try:
             df_fin = ak.stock_financial_analysis_indicator(symbol=ak_code, timeout=_REQUEST_TIMEOUT)
-            if df_fin is not None and not df_fin.empty:
+            if df_fin is not None and not df_fin.empty and len(df_fin) >= 8:
+                df_latest = df_fin.tail(8).reset_index(drop=True)
+
+                # TTM: 最近连续4季度（索引 4..7）的和
+                curr_rev = sum(
+                    self._safe_float(df_latest.loc[i, "营业总收入"])
+                    for i in range(4, 8) if "营业总收入" in df_latest.columns
+                )
+                curr_profit = sum(
+                    self._safe_float(df_latest.loc[i, "净利润"])
+                    for i in range(4, 8) if "净利润" in df_latest.columns
+                )
+                # 去年同期连续4季度（索引 0..3）的和
+                last_rev = sum(
+                    self._safe_float(df_latest.loc[i, "营业总收入"])
+                    for i in range(0, 4) if "营业总收入" in df_latest.columns
+                )
+                last_profit = sum(
+                    self._safe_float(df_latest.loc[i, "净利润"])
+                    for i in range(0, 4) if "净利润" in df_latest.columns
+                )
+
+                # TTM 同比增速
+                if last_rev != 0:
+                    rev_ttm = round(
+                        (curr_rev - last_rev) / abs(last_rev) * 100, 2
+                    )
+                if last_profit != 0:
+                    profit_ttm = round(
+                        (curr_profit - last_profit) / abs(last_profit) * 100, 2
+                    )
+
+                # 极值压制 [-200%, 200%]
+                rev_ttm = max(-200.0, min(200.0, rev_ttm))
+                profit_ttm = max(-200.0, min(200.0, profit_ttm))
+
+                # 保留原单季同比增速作为辅助
+                row = df_latest.tail(1)
+                rev_g = self._safe_float(row["营业总收入同比增长率"].iloc[0]) if "营业总收入同比增长率" in row.columns else 0.0
+                profit_g = self._safe_float(row["净利润同比增长率"].iloc[0]) if "净利润同比增长率" in row.columns else 0.0
+
+            elif df_fin is not None and not df_fin.empty:
+                # 不足 8 季度 → 仅取单季增速
                 row = df_fin.tail(1)
                 rev_g = self._safe_float(row["营业总收入同比增长率"].iloc[0]) if "营业总收入同比增长率" in row.columns else 0.0
                 profit_g = self._safe_float(row["净利润同比增长率"].iloc[0]) if "净利润同比增长率" in row.columns else 0.0
         except Exception:
             pass
 
-        return {"pe": round(pe, 2), "revenue_growth": round(rev_g, 2), "profit_growth": round(profit_g, 2)}
+        return {
+            "pe": round(pe, 2),
+            "revenue_growth": round(rev_g, 2),
+            "profit_growth": round(profit_g, 2),
+            "revenue_ttm_growth": round(rev_ttm, 2),
+            "profit_ttm_growth": round(profit_ttm, 2),
+        }
 
     # ============================================================
     # 行业识别（O(1) 全局字典）
