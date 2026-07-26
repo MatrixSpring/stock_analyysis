@@ -340,3 +340,130 @@ class MultiModelAnalysisService:
             "total_models": health.get("total_models", 0),
             "status": health.get("status", "disabled"),
         }
+
+    # ============================================================
+    # 阶段二：量化+扫描+行业 全维增强分析
+    # ============================================================
+
+    def full_enhanced_analysis(
+        self,
+        stock_code: str,
+        stock_name: str,
+        market_type: str = "A股",
+        industry_name: str = "未知行业",
+        kline_data: Optional[Dict[str, Any]] = None,
+        money_data: Optional[Dict[str, Any]] = None,
+        fund_data: Optional[Dict[str, Any]] = None,
+        news_sentiment: float = 0.0,
+        policy_level: str = "中性",
+        fund_heat: str = "震荡存量",
+        industry_profit_growth: float = 0.0,
+    ) -> Dict[str, Any]:
+        """阶段二完整版分析：AI 共识 + 量化打分 + 形态扫描 + 行业研判。
+
+        一次性输出所有维度的分析结果，可直接用于报告生成。
+
+        Returns:
+            {
+                status, ai_consensus, quant_score,
+                stock_tags, industry_analysis, summary
+            }
+        """
+        result = {
+            "status": "success",
+            "stock_code": stock_code,
+            "stock_name": stock_name,
+            "market_type": market_type,
+            "ai_consensus": None,
+            "quant_score": None,
+            "stock_tags": [],
+            "industry_analysis": None,
+            "summary": "",
+        }
+
+        # ---- 1. 四维量化打分 ----
+        try:
+            from src.services.quant_scorer import quant_engine
+
+            kline = kline_data or {}
+            money = money_data or {}
+            fund = fund_data or {}
+
+            qr = quant_engine.score(
+                kline=kline, money=money, fund=fund,
+                news_sentiment=news_sentiment,
+            )
+            result["quant_score"] = {
+                "total": qr.total_score,
+                "tech": qr.tech_score,
+                "money": qr.money_score,
+                "fund": qr.fund_score,
+                "news": qr.news_score,
+                "up_prob": qr.up_prob,
+                "down_prob": qr.down_prob,
+                "risk_level": qr.risk_level,
+                "suggest": qr.suggest,
+            }
+        except ImportError:
+            logger.debug("[MultiModel] quant_scorer 不可用")
+        except Exception as e:
+            logger.warning(f"[MultiModel] 量化打分失败: {e}")
+
+        # ---- 2. 形态标签扫描 ----
+        try:
+            from src.services.market_scanner import market_scanner
+
+            tags = market_scanner.scan(
+                code=stock_code, name=stock_name,
+                market=market_type, data=kline_data,
+            )
+            result["stock_tags"] = tags
+        except ImportError:
+            logger.debug("[MultiModel] market_scanner 不可用")
+        except Exception as e:
+            logger.warning(f"[MultiModel] 形态扫描失败: {e}")
+
+        # ---- 3. 行业景气度分析 ----
+        try:
+            from src.macro.industry_chain import industry_analyzer
+
+            ia = industry_analyzer.analyze(
+                industry=industry_name,
+                policy_level=policy_level,
+                fund_heat=fund_heat,
+                profit_growth=industry_profit_growth,
+            )
+            result["industry_analysis"] = {
+                "name": ia["industry_name"],
+                "boom_score": ia["boom_score"],
+                "policy": ia["policy_level"],
+                "fund_heat": ia["fund_heat"],
+                "profit_growth": ia["profit_growth"],
+                "chain_text": ia["chain_text"],
+                "key_drivers": ia["key_drivers"],
+                "key_risks": ia["key_risks"],
+                "rank_desc": ia["rank_desc"],
+            }
+        except ImportError:
+            logger.debug("[MultiModel] industry_chain 不可用")
+        except Exception as e:
+            logger.warning(f"[MultiModel] 行业分析失败: {e}")
+
+        # ---- 4. 综合摘要 ----
+        parts = [f"【{stock_name}({stock_code})】"]
+        if result["quant_score"]:
+            q = result["quant_score"]
+            parts.append(
+                f"量化评分: {q['total']}/100 | "
+                f"涨概率: {q['up_prob']}% | 风险: {q['risk_level']}"
+            )
+        if result["stock_tags"]:
+            parts.append(f"形态: {', '.join(result['stock_tags'])}")
+        if result["industry_analysis"]:
+            ia = result["industry_analysis"]
+            parts.append(
+                f"行业({ia['name']}): 景气度 {ia['boom_score']}/100 - {ia['rank_desc']}"
+            )
+        result["summary"] = " | ".join(parts[1:]) if len(parts) > 1 else ""
+
+        return result
