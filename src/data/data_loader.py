@@ -49,9 +49,10 @@ except ImportError:
 # ============================================================
 
 _MAX_CACHE_SIZE = 500
-_CACHE_TTL = 120          # 120 秒过期
-_REQ_INTERVAL = 0.8        # 接口限流间隔
-_REQUEST_TIMEOUT = 10      # 接口 10 秒强制熔断
+_CACHE_TTL = 120
+_REQ_INTERVAL = 0.8
+_REQUEST_TIMEOUT = 10
+_MIN_STOCK_DAYS = 20  # 有效交易天数阈值（次新股过滤）
 
 # 全局限流时间戳
 _LAST_REQ_TIME: float = 0.0
@@ -117,10 +118,13 @@ INDUSTRY_CODE_MAP: Dict[str, str] = {}
 
 # 静态兜底行业库（API 完全不可用时的最后防线）
 _STATIC_INDUSTRY_FALLBACK: Dict[str, str] = {
-    "600519": "消费", "000858": "消费", "002594": "新能源",
-    "300750": "新能源", "000333": "消费", "601318": "券商金融",
-    "600036": "券商金融", "000651": "消费", "002415": "人工智能",
-    "600276": "医药", "300059": "券商金融", "688981": "半导体",
+    "600000": "银行", "601318": "保险", "600036": "银行",
+    "000001": "银行", "601899": "贵金属", "600519": "白酒",
+    "002594": "新能源车", "601766": "轨道交通", "600019": "钢铁",
+    "300750": "锂电池", "300274": "光伏设备", "688008": "半导体",
+    "000858": "白酒", "000333": "消费", "000651": "消费",
+    "002415": "人工智能", "600276": "医药", "300059": "券商金融",
+    "688981": "半导体", "601398": "银行", "600809": "白酒",
 }
 
 
@@ -269,17 +273,36 @@ class StockDataLoader:
             return default
 
     @staticmethod
+    def is_invalid_stock(code: str) -> bool:
+        """筛查无效个股：ST / *ST / 退市 / 停牌 / 次新。
+
+        Returns:
+            True = 无效标的，直接返回兜底数据，不参与打分
+        """
+        code = str(code).strip().upper()
+        if code.startswith(("ST", "*ST", "退", "*退")):
+            return True
+        return False
+
+    @staticmethod
     def calc_safe_rsi(close_series: pd.Series, period: int = 14) -> float:
-        """工业级安全 RSI：全场景防除零 / NaN / Inf"""
+        """工业级安全 RSI：全场景防除零 / NaN / Inf。
+
+        S1 升级：数据不足 14 日时自动降级可用周期，
+        解决次新股上市不足 14 日打分失真问题。
+        """
         try:
-            if len(close_series) < period:
+            data_len = len(close_series)
+            if data_len < 5:
                 return 50.0
+            # 动态适配周期：次新股不足 14 日用可用长度
+            win = period if data_len >= period else max(5, data_len - 1)
             close = close_series.astype(float)
             delta = close.diff()
             gain = delta.where(delta > 0, 0.0)
             loss = (-delta).where(delta < 0, 0.0)
-            g_avg = float(gain.rolling(period).mean().iloc[-1])
-            l_avg = float(loss.rolling(period).mean().iloc[-1])
+            g_avg = float(gain.rolling(win).mean().iloc[-1])
+            l_avg = float(loss.rolling(win).mean().iloc[-1])
             if np.isnan(g_avg): g_avg = 0.0
             if np.isnan(l_avg): l_avg = 0.0
             if l_avg == 0.0:
@@ -329,8 +352,8 @@ class StockDataLoader:
             start_date="", end_date="", adjust="qfq",
             timeout=_REQUEST_TIMEOUT,
         )
-        if df is None or df.empty or len(df) < 20:
-            return _kline_template()
+        if df is None or df.empty or len(df) < _MIN_STOCK_DAYS:
+            return _kline_template()  # 次新/数据不足 → 模板兜底
         return self._compute_kline_indicators(df.tail(20))
 
     def _kline_from_baostock(self, code: str) -> Dict[str, Any]:
@@ -402,11 +425,15 @@ class StockDataLoader:
         except Exception:
             pass
 
+        # S1: 北向资金多字段兼容（AKShare 字段不定期变更）
         north_in = 0.0
         try:
             df_n = ak.stock_hsgt_individual(symbol=ak_code, timeout=_REQUEST_TIMEOUT)
             if df_n is not None and not df_n.empty:
-                north_in = self._safe_float(df_n["北向资金净流入"].iloc[-1])
+                for fld in ("北向资金净流入", "北向净流入", "净流入"):
+                    if fld in df_n.columns:
+                        north_in = self._safe_float(df_n[fld].iloc[-1])
+                        break
         except Exception:
             pass
 
