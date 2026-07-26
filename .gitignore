@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Node
+node_modules/
+apps/dsa-web/dist/
+apps/dsa-desktop/dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs & Data
+logs/
+*.log
+data/cache/
+
+# Env (keep .env.example)
+.env
+!.env.example
+
+# Reports (generated)
+reports/*.md
+reports/*.html
+
+# Docker
+docker-compose.override.yml
+
+# Test cache
+.pytest_cache/
