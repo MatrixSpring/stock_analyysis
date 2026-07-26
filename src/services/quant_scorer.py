@@ -184,9 +184,12 @@ class QuantScoreEngine:
             elif turnover < 1:
                 score -= 5
                 details["turnover"] = f"换手过低({turnover:.1f}%) -5"
+            elif turnover > 20:
+                score -= 5
+                details["turnover"] = f"换手过高({turnover:.1f}%) -5"
             elif turnover > 25:
                 score -= 3
-                details["turnover"] = f"换手过高({turnover:.1f}%) -3"
+                details["turnover"] = f"妖股嫌疑({turnover:.1f}%) -3"
             else:
                 details["turnover"] = f"换手率({turnover:.1f}%) 0"
 
@@ -215,18 +218,18 @@ class QuantScoreEngine:
         try:
             # 1. PE 估值 (±10)
             pe = float(fund.get("pe") or 30)
-            if pe < 15:
+            if 10 < pe < 25:
                 score += 10
-                details["pe"] = f"低估值(PE={pe:.0f}) +10"
-            elif pe < 25:
-                score += 6
-                details["pe"] = f"合理偏低(PE={pe:.0f}) +6"
-            elif pe > 80:
+                details["pe"] = f"估值合理(PE={pe:.0f}) +10"
+            elif pe > 80 or pe < 0:
                 score -= 10
-                details["pe"] = f"高估值(PE={pe:.0f}) -10"
+                details["pe"] = f"估值异常(PE={pe:.0f}) -10"
             elif pe > 60:
                 score -= 5
                 details["pe"] = f"估值偏高(PE={pe:.0f}) -5"
+            elif pe < 15:
+                score += 6
+                details["pe"] = f"低估值(PE={pe:.0f}) +6"
             else:
                 details["pe"] = f"PE={pe:.0f} 0"
 
