@@ -342,6 +342,54 @@ class MultiModelAnalysisService:
         }
 
     # ============================================================
+    # 阶段三：DataLoader 真实数据驱动的全维分析
+    # ============================================================
+
+    def analyze_with_real_data(
+        self,
+        stock_code: str,
+        stock_name: str = "",
+        market_type: str = "A股",
+    ) -> Dict[str, Any]:
+        """一键全自动真实数据驱动分析。
+
+        使用 DataLoader 自动抓取 AKShare/BaoStock 真实行情，
+        然后串联 量化打分 → 形态扫描 → 行业分析 全链路。
+
+        无需手动传入任何数据——所有 kline/money/fund/industry 全自动获取。
+        数据源失败时自动降级为模板数据，保证不崩溃。
+        """
+        real_data = None
+        try:
+            from src.data.data_loader import data_loader
+            real_data = data_loader.load_all(stock_code)
+            logger.info(
+                f"[MultiModel] {stock_code} 真实数据加载成功 "
+                f"(行业={real_data.get('industry_name')})"
+            )
+        except ImportError:
+            logger.debug("[MultiModel] data_loader 不可用，使用模板数据")
+        except Exception as e:
+            logger.warning(f"[MultiModel] 数据加载异常: {e}")
+
+        if real_data is None:
+            real_data = {}
+
+        return self.full_enhanced_analysis(
+            stock_code=stock_code,
+            stock_name=stock_name or stock_code,
+            market_type=market_type,
+            industry_name=real_data.get("industry_name", "未知行业"),
+            kline_data=real_data.get("kline_data"),
+            money_data=real_data.get("money_data"),
+            fund_data=real_data.get("fund_data"),
+            news_sentiment=real_data.get("news_sentiment", 0.0),
+            industry_profit_growth=float(
+                real_data.get("fund_data", {}).get("profit_growth", 0)
+            ),
+        )
+
+    # ============================================================
     # 阶段二：量化+扫描+行业 全维增强分析
     # ============================================================
 
