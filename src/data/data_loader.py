@@ -23,14 +23,21 @@ from typing import Any, Dict, Optional, Tuple
 import numpy as np
 import pandas as pd
 
+import threading
+
 from src.data.config import (
     REQUEST_TIMEOUT, REQ_INTERVAL,
-    MAX_CACHE_SIZE, CACHE_TTL,
+    MAX_CACHE_SIZE, CACHE_TTL_KLINE, CACHE_TTL_MONEY, CACHE_TTL_FUNDAMENTAL,
     MIN_STOCK_DAYS, PE_UPPER_LIMIT, PE_LOWER_LIMIT, GROWTH_EXTREME_LIMIT,
     RSI_DEFAULT_PERIOD, RSI_MIN_PERIOD, VOL_RATIO_DAYS,
     NORTH_BOUND_FIELD_NAMES,
     INDUSTRY_RETRY_TIMES, INDUSTRY_RETRY_SLEEP, INDUSTRY_DEFAULT_NAME,
+    STATIC_INDUSTRY_BACKUP,
+    FAIL_BLACKLIST_COOLDOWN, FAIL_BLACKLIST_MAX_RETRY,
+    BS_HEARTBEAT_INTERVAL, UP_LIMIT_RATIO, DOWN_LIMIT_RATIO,
+    TTM_QUARTERS,
 )
+from src.data.global_stat import GlobalStat
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +65,6 @@ except ImportError:
 # ============================================================
 
 # 全局工业级配置（引自 src.data.config）
-_MAX_CACHE_SIZE = MAX_CACHE_SIZE
-_CACHE_TTL = CACHE_TTL
 _REQ_INTERVAL = REQ_INTERVAL
 _REQUEST_TIMEOUT = REQUEST_TIMEOUT
 _MIN_STOCK_DAYS = MIN_STOCK_DAYS
@@ -72,53 +77,123 @@ _LAST_REQ_TIME: float = 0.0
 # ============================================================
 
 class ExpireCache:
-    """TTL 过期 + LRU 淘汰 + 容量上限，三位一体。
+    """线程安全 TTL 过期 + LRU 淘汰 + 差异化缓存策略（P0+P1）。
 
-    解决旧版 @lru_cache + 分离 dict 导致的：
-      - 缓存实际不生效（数据未正确存取）
-      - @lru_cache 存 key 而非数据
-      - 无容量上限导致内存泄漏
+    P0: threading.Lock 读写锁，多线程安全
+    P1: 按数据类型分 TTL — K线 60s / 资金 120s / 财务 300s
     """
 
-    __slots__ = ("_data", "_max_size", "_ttl")
+    __slots__ = ("_data", "_max_size", "_lock", "_ttl_map")
 
-    def __init__(self, max_size: int = 500, ttl: int = 120):
+    def __init__(self, max_size: int = 500):
         self._data: Dict[str, Dict[str, Any]] = {}
         self._max_size = max_size
-        self._ttl = ttl
+        self._lock = threading.Lock()
+        self._ttl_map = {
+            "kline_": CACHE_TTL_KLINE,
+            "money_": CACHE_TTL_MONEY,
+            "fund_": CACHE_TTL_FUNDAMENTAL,
+        }
+
+    def _ttl_for(self, key: str) -> int:
+        for prefix, ttl in self._ttl_map.items():
+            if key.startswith(prefix):
+                return ttl
+        return CACHE_TTL_MONEY
 
     def get(self, key: str) -> Optional[Dict[str, Any]]:
-        entry = self._data.get(key)
-        if entry is None:
-            return None
-        if time.time() - entry["t"] > self._ttl:
-            del self._data[key]
-            return None
-        # LRU: 访问时更新时间戳
-        entry["t"] = time.time()
-        return entry["d"]
+        with self._lock:
+            entry = self._data.get(key)
+            if entry is None:
+                GlobalStat.inc_cache_miss()
+                return None
+            if time.time() - entry["t"] > self._ttl_for(key):
+                del self._data[key]
+                GlobalStat.inc_cache_miss()
+                return None
+            entry["t"] = time.time()
+            GlobalStat.inc_cache_hit()
+            return entry["d"]
 
     def set(self, key: str, data: Dict[str, Any]):
-        # 容量超限 → 淘汰最旧一半
-        if len(self._data) >= self._max_size:
-            expire_count = self._max_size // 2
-            oldest = sorted(
-                self._data.keys(), key=lambda k: self._data[k]["t"]
-            )[:expire_count]
-            for k in oldest:
-                del self._data[k]
-            logger.debug(f"[Cache] LRU 淘汰 {len(oldest)} 条, 剩余 {len(self._data)}")
-        self._data[key] = {"t": time.time(), "d": data}
+        with self._lock:
+            if len(self._data) >= self._max_size:
+                oldest = sorted(
+                    self._data.keys(), key=lambda k: self._data[k]["t"]
+                )[: self._max_size // 2]
+                for k in oldest:
+                    del self._data[k]
+            self._data[key] = {"t": time.time(), "d": data}
 
     def clear(self):
-        self._data.clear()
+        with self._lock:
+            self._data.clear()
 
     def __len__(self) -> int:
-        return len(self._data)
+        with self._lock:
+            return len(self._data)
 
 
 # 全局缓存单例
-_CACHE = ExpireCache(_MAX_CACHE_SIZE, _CACHE_TTL)
+_CACHE = ExpireCache(MAX_CACHE_SIZE)
+
+# Baostock 心跳状态
+_BS_LOGINED: bool = False
+_BS_LAST_HEARTBEAT: float = 0.0
+
+# 失败黑名单（P1）
+_FAIL_BLACKLIST: Dict[str, float] = {}  # code → cooldown_until
+_FAIL_COUNTS: Dict[str, int] = {}
+
+# 线程安全限流锁（P0）
+_REQ_LOCK = threading.Lock()
+
+
+def _thread_safe_rate_limit():
+    """P0: 线程安全全局限流"""
+    global _LAST_REQ_TIME
+    with _REQ_LOCK:
+        now = time.time()
+        if now - _LAST_REQ_TIME < REQ_INTERVAL:
+            time.sleep(REQ_INTERVAL - (now - _LAST_REQ_TIME))
+        _LAST_REQ_TIME = time.time()
+
+
+def _bs_heartbeat_check() -> bool:
+    """P0: Baostock 心跳检测 + 断线自愈"""
+    global _BS_LOGINED, _BS_LAST_HEARTBEAT
+    if not _bs_available:
+        return False
+    now = time.time()
+    if not _BS_LOGINED or (now - _BS_LAST_HEARTBEAT) > BS_HEARTBEAT_INTERVAL:
+        try:
+            bs.logout()
+        except Exception:
+            pass
+        try:
+            bs.login()
+            _BS_LOGINED = True
+            _BS_LAST_HEARTBEAT = now
+            logger.debug("[DataLoader] Baostock 心跳重连成功")
+        except Exception as e:
+            _BS_LOGINED = False
+            logger.error(f"[DataLoader] Baostock 重连失败: {e}")
+    return _BS_LOGINED
+
+
+def _is_blacklisted(code: str) -> bool:
+    """P1: 失败黑名单冷却检查"""
+    until = _FAIL_BLACKLIST.get(code, 0)
+    return time.time() < until
+
+
+def _mark_fail(code: str):
+    """P1: 记录失败，超阈值加入黑名单"""
+    count = _FAIL_COUNTS.get(code, 0) + 1
+    _FAIL_COUNTS[code] = count
+    if count >= FAIL_BLACKLIST_MAX_RETRY:
+        _FAIL_BLACKLIST[code] = time.time() + FAIL_BLACKLIST_COOLDOWN
+        logger.warning(f"[DataLoader] {code} 加入黑名单 {FAIL_BLACKLIST_COOLDOWN}s")
 
 # ============================================================
 # 行业字典初始化（3 次重试 + 静态库兜底）
@@ -126,16 +201,7 @@ _CACHE = ExpireCache(_MAX_CACHE_SIZE, _CACHE_TTL)
 
 INDUSTRY_CODE_MAP: Dict[str, str] = {}
 
-# 静态兜底行业库（API 完全不可用时的最后防线）
-_STATIC_INDUSTRY_FALLBACK: Dict[str, str] = {
-    "600000": "银行", "601318": "保险", "600036": "银行",
-    "000001": "银行", "601899": "贵金属", "600519": "白酒",
-    "002594": "新能源车", "601766": "轨道交通", "600019": "钢铁",
-    "300750": "锂电池", "300274": "光伏设备", "688008": "半导体",
-    "000858": "白酒", "000333": "消费", "000651": "消费",
-    "002415": "人工智能", "600276": "医药", "300059": "券商金融",
-    "688981": "半导体", "601398": "银行", "600809": "白酒",
-}
+# 静态兜底行业库（引自 config 配置中心）
 
 
 def _init_industry_map():
@@ -183,7 +249,7 @@ def _init_industry_map():
         pass
 
     # 兜底：静态行业库 + 日志告警
-    INDUSTRY_CODE_MAP = dict(_STATIC_INDUSTRY_FALLBACK)
+    INDUSTRY_CODE_MAP = dict(STATIC_INDUSTRY_BACKUP)
     logger.warning(
         f"[DataLoader] 行业字典 API 不可用，降级为静态库 "
         f"({len(INDUSTRY_CODE_MAP)} 只)；其他股票将返回'{INDUSTRY_DEFAULT_NAME}'"
@@ -192,26 +258,7 @@ def _init_industry_map():
 
 _init_industry_map()
 
-# ============================================================
-# Baostock 全局单例登录（杜绝重复 login 内存堆积）
-# ============================================================
-
-_BS_LOGINED = False
-
-
-def _bs_global_login():
-    """全局单例登录——进程生命周期内仅调用一次 bs.login()"""
-    global _BS_LOGINED
-    if not _BS_LOGINED and _bs_available:
-        try:
-            bs.login()
-            _BS_LOGINED = True
-            logger.debug("[DataLoader] BaoStock 单例登录成功")
-        except Exception as e:
-            logger.warning(f"[DataLoader] BaoStock 登录失败: {e}")
-
-
-_bs_global_login()
+_bs_heartbeat_check()  # 启动时建立 Baostock 连接
 
 # ============================================================
 # 空数据模板
@@ -244,18 +291,8 @@ class StockDataLoader:
     def __init__(self):
         self._ak_ok = _ak_available
         self._bs_ok = _bs_available
-
-    # ---- 限流 ----
-
-    @staticmethod
-    def _rate_limit():
-        """全局限流——所有实例共享同一时间戳，多线程安全"""
-        global _LAST_REQ_TIME
-        now = time.time()
-        gap = now - _LAST_REQ_TIME
-        if gap < _REQ_INTERVAL:
-            time.sleep(_REQ_INTERVAL - gap)
-        _LAST_REQ_TIME = time.time()
+        _bs_heartbeat_check()
+        logger.info("[DataLoader] 初始化完成")
 
     # ---- 代码标准化 ----
 
@@ -336,7 +373,7 @@ class StockDataLoader:
         if cached:
             return cached
 
-        self._rate_limit()
+        _thread_safe_rate_limit()
 
         if self._ak_ok:
             try:
@@ -422,7 +459,7 @@ class StockDataLoader:
         if cached:
             return cached
 
-        self._rate_limit()
+        _thread_safe_rate_limit()
         if self._ak_ok:
             try:
                 result = self._money_from_akshare(code)
@@ -472,7 +509,7 @@ class StockDataLoader:
         if cached:
             return cached
 
-        self._rate_limit()
+        _thread_safe_rate_limit()
         if self._ak_ok:
             try:
                 result = self._fund_from_akshare(code)
@@ -536,11 +573,13 @@ class StockDataLoader:
                         (curr_rev - last_rev) / abs(last_rev) * 100, 2
                     )
                 if last_profit != 0:
-                    profit_ttm = round(
-                        (curr_profit - last_profit) / abs(last_profit) * 100, 2
-                    )
+                    raw_profit_ttm = (curr_profit - last_profit) / abs(last_profit) * 100
+                    # P2: 去年亏损今年盈利 → 正向修复，避免爆值
+                    if last_profit < 0 and curr_profit > 0:
+                        raw_profit_ttm = min(raw_profit_ttm, GROWTH_EXTREME_LIMIT * 0.75)
+                    profit_ttm = round(raw_profit_ttm, 2)
 
-                # 极值压制 [-200%, 200%]
+                # 极值压制
                 rev_ttm = max(-GROWTH_EXTREME_LIMIT, min(GROWTH_EXTREME_LIMIT, rev_ttm))
                 profit_ttm = max(-GROWTH_EXTREME_LIMIT, min(GROWTH_EXTREME_LIMIT, profit_ttm))
 
@@ -599,14 +638,22 @@ data_loader = StockDataLoader()
 
 
 def _cleanup():
-    """程序退出统一释放资源"""
+    """P3: 优雅退出 — 释放资源 + 输出运行统计"""
     if _BS_LOGINED:
         try:
             bs.logout()
         except Exception:
             pass
     _CACHE.clear()
-    logger.debug("[DataLoader] 退出清理完成")
+
+    stat = GlobalStat.report()
+    logger.info(
+        "[DataLoader] 程序退出 | "
+        f"缓存命中率: {stat['cache_hit_rate_pct']}% "
+        f"({stat['cache_hit']}/{stat['cache_hit'] + stat['cache_miss']}) | "
+        f"请求成功率: {100 - stat['req_fail_rate_pct']}% "
+        f"({stat['req_total']} total, {stat['req_fail']} fail)"
+    )
 
 
 atexit.register(_cleanup)
