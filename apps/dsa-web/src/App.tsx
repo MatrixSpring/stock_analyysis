@@ -35,6 +35,7 @@ const ParticipantGraph = lazy(() => import('./pages/visuals/ParticipantGraph'));
 const GeoEventTopology = lazy(() => import('./pages/visuals/GeoEventTopology'));
 const DimensionTree = lazy(() => import('./pages/visuals/DimensionTree'));
 const IndustryChainTopology = lazy(() => import('./pages/visuals/IndustryChainTopology'));
+const MultiConsensusPage = lazy(() => import('./pages/MultiConsensusPage'));
 const LegacyHubPage = lazy(() => import('./pages/LegacyHubPage'));
 
 const AppContent: React.FC = () => {
@@ -92,6 +93,7 @@ const AppContent: React.FC = () => {
           <Route path="/visuals/geo-event" element={<GeoEventTopology />} />
           <Route path="/visuals/dimension-tree" element={<DimensionTree />} />
           <Route path="/visuals/industry-chain" element={<IndustryChainTopology />} />
+          <Route path="/multi-consensus" element={<MultiConsensusPage />} />
           <Route path="/auto-strategy" element={<DashboardPage />} />
           <Route path="/old" element={<LegacyHubPage />} />
           <Route path="/strategy-center" element={<StrategyCenterPage />} />
