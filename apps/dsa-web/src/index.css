@@ -3068,3 +3068,67 @@ textarea {
 
 /* Tooltip z-layer lock */
 .cyber-tooltip { z-index: 9999 !important; position: relative; }
+
+/* =========================================
+   9. FINAL: 全局样式隔离 + 基础组件美化 + 滚动条 + 七态按钮 + 遮罩
+   ========================================= */
+.root-dark-theme {
+  background-color: var(--cyber-bg-deep, #080C18) !important;
+  color: #E5E6EB !important;
+}
+.root-dark-theme ::-webkit-scrollbar { width:6px; height:6px; }
+.root-dark-theme ::-webkit-scrollbar-thumb { background:rgba(22,119,255,0.3); border-radius:3px; }
+.root-dark-theme ::-webkit-scrollbar-track { background:transparent; }
+
+/* Input/Select/Textarea */
+.root-dark-theme input,
+.root-dark-theme select,
+.root-dark-theme textarea {
+  background: rgba(30,48,80,0.3) !important;
+  border: 1px solid rgba(64,150,255,0.15) !important;
+  color: #E5E6EB !important; border-radius: 6px !important;
+  transition: all 0.25s;
+}
+.root-dark-theme input:focus,
+.root-dark-theme select:focus {
+  border-color: #1677FF !important;
+  box-shadow: 0 0 10px rgba(22,119,255,0.25) !important;
+  outline: none !important;
+}
+
+/* Tech data table */
+.dsa-tech-table { width:100%; border-collapse:collapse; background:transparent; }
+.dsa-tech-table th { background:rgba(22,119,255,0.1); color:#fff; padding:12px 8px; text-align:center; border-bottom:1px solid rgba(64,150,255,0.15); }
+.dsa-tech-table td { padding:10px 8px; text-align:center; border-bottom:1px solid rgba(64,150,255,0.08); color:#E5E6EB; }
+.dsa-tech-table tr:hover { background:rgba(22,119,255,0.08); box-shadow:0 0 12px rgba(22,119,255,0.12); }
+
+/* 7-state buttons */
+.dsa-btn { position:relative; background:linear-gradient(135deg,rgba(22,119,255,0.15),rgba(22,119,255,0.05)); border:1px solid #1677FF; color:#fff; padding:6px 16px; border-radius:6px; transition:all 0.25s; overflow:hidden; cursor:pointer; }
+.dsa-btn:hover { background:#1677FF; box-shadow:0 0 12px rgba(22,119,255,0.4); }
+.dsa-btn:active { transform:scale(0.96); }
+.dsa-btn:disabled,.dsa-btn-disabled { opacity:0.5; pointer-events:none; }
+.dsa-btn-success { border-color:#36CFC9; background:linear-gradient(135deg,rgba(54,207,201,0.15),rgba(54,207,201,0.05)); }
+.dsa-btn-error { border-color:#F53F3F; background:linear-gradient(135deg,rgba(245,63,63,0.15),rgba(245,63,63,0.05)); }
+
+/* Scroll gradient mask */
+.scroll-mask-bottom { position:relative; }
+.scroll-mask-bottom::after { content:''; position:absolute; left:0; bottom:0; width:100%; height:40px; background:linear-gradient(transparent,#080C18); pointer-events:none; }
+
+/* Empty state */
+.empty-tech-wrap { width:100%; padding:60px 0; text-align:center; color:#86909C; font-size:14px; }
+
+/* AI report code-style container */
+.ai-report-wrap { background:#0F172A; border-radius:8px; border:1px solid rgba(64,150,255,0.15); padding:20px; font-family:Consolas,Monaco,monospace; color:#E5E6EB; line-height:1.8; }
+.ai-report-wrap .title-high { color:#1677FF; font-weight:bold; }
+.ai-report-wrap .risk-red { color:#F53F3F; }
+.ai-report-wrap .profit-green { color:#36CFC9; }
+.ai-report-wrap .turn-orange { color:#FAAD14; }
+
+/* Stream typing cursor */
+.ai-stream-text { border-right:2px solid #1677FF; animation:blinkCursor 0.8s infinite; }
+@keyframes blinkCursor { 0%,100%{border-color:#1677FF} 50%{border-color:transparent} }
+
+/* Animation perf: pause when hidden */
+@media (prefers-reduced-motion: reduce) {
+  .breath-light, .scan-line, .dsa-card-active, .cyber-pulse { animation:none !important; }
+}
