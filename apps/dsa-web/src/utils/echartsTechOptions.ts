@@ -66,3 +66,23 @@ export function refreshChartWithTransition(chart: any, option: any) {
   chart?.setOption(option, { notMerge: true, lazyUpdate: false });
   chart?.resize();
 }
+
+/** 多模型共识对比图表 — 共识主线高亮发光 + 子模型差异化浅色曲线 */
+export function getMultiModelChartOption(
+  modelList: { name: string; data: number[] }[],
+  consensusData: number[],
+) {
+  const colors = ['#36C9A8', '#FFB845', '#9254DE', '#F85454'];
+  return {
+    backgroundColor: 'transparent',
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(14,20,32,0.95)', borderColor: '#2388FF', textStyle: { color: '#E5E6EB' } },
+    grid: { left: '3%', right: '4%', bottom: '3%', top: '15%', containLabel: true },
+    legend: { textStyle: { color: '#86909C' } },
+    xAxis: { type: 'category', axisLine: { lineStyle: { color: 'rgba(35,136,255,0.15)' } }, splitLine: { show: false } },
+    yAxis: { max: 1, min: 0, axisLine: { lineStyle: { color: 'rgba(35,136,255,0.15)' } }, splitLine: { lineStyle: { color: 'rgba(35,136,255,0.1)' } } },
+    series: [
+      { name: '多模型共识', type: 'line', data: consensusData, smooth: true, lineStyle: { color: '#2388FF', width: 3 }, shadowBlur: 15, shadowColor: 'rgba(35,136,255,0.5)' },
+      ...modelList.map((m, i) => ({ name: m.name, type: 'line', data: m.data, smooth: true, lineStyle: { color: colors[i % 4], width: 1.5, opacity: 0.8 }, symbol: 'none' })),
+    ],
+  };
+}

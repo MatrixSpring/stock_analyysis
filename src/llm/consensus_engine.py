@@ -571,6 +571,66 @@ class ConsensusEngine:
 
 
 # ============================================================
+# P3: 多模型动态自适应加权共识（修复静态权重 + 容错兜底）
+# ============================================================
+
+def multi_model_consensus_merge(model_results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """多模型动态加权共识融合。
+
+    修复：
+      - 静态权重固化 → 根据近期胜率动态自适应
+      - 单模型异常崩溃 → 自动降级兜底，不中断整体计算
+
+    Args:
+        model_results: [{"score":0.65, "confidence":0.8, "recent_win_rate":0.7, ...}, ...]
+
+    Returns:
+        {consensus_score, trend, confidence, valid_model_count, total_model_count}
+    """
+    valid = []
+    weight_sum = 0.0
+
+    # 容错过滤异常模型
+    for res in model_results:
+        if not res or res.get("score") is None:
+            continue
+        w = float(res.get("recent_win_rate", 0.2) or 0.2)
+        w = max(0.05, min(1.0, w))  # clamp [0.05, 1.0]
+        valid.append({**res, "dynamic_weight": w})
+        weight_sum += w
+
+    # 兜底：无有效模型返回默认平稳预测
+    if not valid or weight_sum == 0:
+        return {
+            "consensus_score": 0.5, "trend": "oscillation",
+            "confidence": 0.0, "valid_model_count": 0,
+            "total_model_count": len(model_results),
+        }
+
+    # 动态加权共识
+    final_score = sum(
+        float(r["score"]) * r["dynamic_weight"] for r in valid
+    ) / weight_sum
+    confidence = sum(
+        float(r.get("confidence", 0.5)) * r["dynamic_weight"] for r in valid
+    ) / weight_sum
+
+    trend = (
+        "up" if final_score > 0.55
+        else "down" if final_score < 0.45
+        else "oscillation"
+    )
+
+    return {
+        "consensus_score": round(final_score, 4),
+        "trend": trend,
+        "confidence": round(confidence, 4),
+        "valid_model_count": len(valid),
+        "total_model_count": len(model_results),
+    }
+
+
+# ============================================================
 # 便捷函数
 # ============================================================
 
