@@ -12,3 +12,4 @@ export { DataTraceModal } from './DataTraceModal';
 export { DashboardPanelHeader } from './DashboardPanelHeader';
 export { DashboardStateBlock } from './DashboardStateBlock';
 export { ModuleHeader } from './ModuleHeader';
+export { ModuleNavigator } from './ModuleNavigator';

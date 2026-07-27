@@ -12,6 +12,7 @@ import {
 import {
   SystemStatusBar, MarketTrend, RecentStock,
   RiskOverview, PolicyTrack, GameShort, GameLong,
+  ModuleNavigator,
 } from '../components/dashboard';
 
 function LegacyToolsBar() {
@@ -67,9 +68,11 @@ export default function DashboardPage() {
         <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 2, letterSpacing: -0.3 }}>
           量化决策终端
         </h1>
-        <p style={{ fontSize: 13, color: '#64748B', marginBottom: 18 }}>
+        <p style={{ fontSize: 13, color: '#64748B', marginBottom: 14 }}>
           短中长线交易 · 政策赛道 · 资金博弈 · 全维度风控
         </p>
+
+        <ModuleNavigator />
 
         {/* === 第一行：市场趋势 + 最近股票 + 风险监控 === */}
         <div style={{
