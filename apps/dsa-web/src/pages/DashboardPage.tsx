@@ -4,11 +4,10 @@
  * 布局：顶部悬浮状态栏 + 2行×3列自适应六宫格 + 底部传统工具入口
  * 规格：模块等比例缩放 / 深色主题 #0F131E / 8px 卡片圆角 / 20px 内边距
  */
-import type React from 'react';
 import { Link } from 'react-router-dom';
 import {
   BarChart3, Clock, TrendingUp, Shield, Star, Settings,
-  Zap, Landmark, AlertTriangle,
+  Zap, AlertTriangle,
 } from 'lucide-react';
 import {
   SystemStatusBar, MarketTrend, RecentStock,

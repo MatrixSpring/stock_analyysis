@@ -22,19 +22,19 @@ const statusConfig = {
 export function SystemStatusBar() {
   const [status, setStatus] = useState<SystemStatus | null>(null);
 
-  const fetchStatus = useCallback(async () => {
+  const doFetchStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/system/status');
+      const res = await window.fetch('/api/v1/system/status');
       const json = await res.json();
       if (json.code === 200) setStatus(json.data);
     } catch { /* degraded */ }
   }, []);
 
   useEffect(() => {
-    fetchStatus();
-    const t = setInterval(fetchStatus, 60_000);
+    doFetchStatus();
+    const t = setInterval(doFetchStatus, 60_000);
     return () => clearInterval(t);
-  }, [fetchStatus]);
+  }, [doFetchStatus]);
 
   const cfg = status ? statusConfig[status.systemStatus] : statusConfig.normal;
 

@@ -1,0 +1,15 @@
+你上一轮输出无法解析为标准 JSON，错误信息：
+{{ error_info }}
+
+【原始用户指令】
+{{ origin_prompt }}
+
+【上一轮输出】
+{{ origin_response }}
+
+【强制要求】
+1. 仅输出纯标准 JSON，不能有任何解释、注释、markdown
+2. 严格遵守如下 Schema：
+{{ schema_desc }}
+3. 禁止 // 注释、禁止多余字符、禁止 markdown 代码块标记
+4. 所有字段类型必须与 Schema 一致

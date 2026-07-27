@@ -1,0 +1,23 @@
+【舆情异动预警】{{ symbol }} | {{ name }}
+
+⏰ 触发时间: {{ timestamp }}
+📊 异动类型: {{ alert_type }}
+🔴 风险等级: {{ risk_level }}
+
+## 异动详情
+{{ alert_detail }}
+
+## 情绪数据
+- 情感得分: {{ current_score }}
+- 近期趋势: {{ trend }}
+- 多空分歧: {{ divergence }}
+
+## 相关行情
+- 最新价: {{ latest_price }}
+- 涨跌幅: {{ price_change }}
+
+## 可能原因
+{{ possible_reasons }}
+
+## 建议
+{{ suggestion }}

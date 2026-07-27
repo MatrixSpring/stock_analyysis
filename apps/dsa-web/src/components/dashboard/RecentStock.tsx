@@ -9,15 +9,15 @@ export function RecentStock() {
   const [data, setData] = useState<any>(null);
   const [tab, setTab] = useState('select');
 
-  const fetch = useCallback(async () => {
+  const doFetch = useCallback(async () => {
     try {
-      const r = await fetch(`/api/v1/stock/recent?type=${tab}`);
+      const r = await window.fetch(`/api/v1/stock/recent?type=${tab}`);
       const j = await r.json();
       if (j.code === 200) setData(j.data);
     } catch { /* */ }
   }, [tab]);
 
-  useEffect(() => { fetch(); const t = setInterval(fetch, 10_000); return () => clearInterval(t); }, [fetch]);
+  useEffect(() => { doFetch(); const t = setInterval(doFetch, 10_000); return () => clearInterval(t); }, [doFetch]);
 
   const tabs = [
     { key: 'select', label: '策略选股' },

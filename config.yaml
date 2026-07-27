@@ -1,0 +1,60 @@
+# ============================================================
+# DSA daily_stock_analysis — 全局统一配置
+# 适配项目路径: /Users/a123456/Downloads/AABB/0725/daily_stock_analysis
+# ============================================================
+
+storage:
+  mongo:
+    uri: mongodb://localhost:27017
+    db: dsa_stock
+  redis_url: redis://localhost:6379/0
+
+flow:
+  dag_run_mode: "continue_on_partial"     # continue_on_partial / break_on_core_miss
+  core_data_sources: ["stock_daily", "stock_chip"]
+
+llm:
+  prompt_version: "v2.0"
+  prompt_reload_on_change: false
+  structured_output:
+    max_retry_times: 2
+
+monitor:
+  source_stats_cache_ttl: 60
+  source_abnormal_threshold: 0.6
+
+sentiment:
+  agg_cache_ttl_min: 30
+  spike_post_growth_rate: 1.8
+  spike_sentiment_shift: 0.35
+
+cache:
+  ttl_base: 3600
+  ttl_jitter: 300
+  empty_ttl: 60
+
+feature:
+  enable_nosql_storage: true
+  enable_cache_layer: true
+  enable_auto_provider_route: true
+  enable_chip_distribution: true
+  enable_intraday_data: true
+  enable_fundamental_pipeline: true
+  enable_multi_model_compare: true     # 多模型对比分析开关
+
+# GitHub 免费 LLM 模型池（零成本、无信用卡）
+github_models:
+  enabled: true                         # 启用后接入免费模型池
+  api_key: "${GITHUB_MODELS_TOKEN}"     # GitHub PAT (packages:read)
+  api_base: "https://models.inference.ai.azure.com"
+  timeout: 60
+  max_retries: 3
+  temperature: 0.3                      # 量化分析固定低随机度
+  rpm_limit: 15
+  tpm_limit: 20000
+  model_list:
+    - gpt-4o
+    - gpt-4o-mini
+  # 灰度策略
+  gradual_rollout_pct: 0               # 0=仅测试, 100=全量
+  cache_ttl_minutes: 720               # 相同标的缓存12小时

@@ -117,33 +117,8 @@ router.include_router(
 )
 
 # ---- v2.1.0 Dashboard 仪表盘端点 ----
+# dashboard.router 已内置完整路径前缀，只需挂载一次
 router.include_router(
     dashboard.router,
-    prefix="/market",
-    tags=["Market"]
-)
-router.include_router(
-    dashboard.router,
-    prefix="/stock",
-    tags=["Stock"]
-)
-router.include_router(
-    dashboard.router,
-    prefix="/risk",
-    tags=["Risk"]
-)
-router.include_router(
-    dashboard.router,
-    prefix="/policy",
-    tags=["Policy"]
-)
-router.include_router(
-    dashboard.router,
-    prefix="/game",
-    tags=["Game"]
-)
-router.include_router(
-    dashboard.router,
-    prefix="/system",
-    tags=["System"]
+    tags=["Dashboard"]
 )

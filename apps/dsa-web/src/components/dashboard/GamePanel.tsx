@@ -8,15 +8,15 @@ import { DashboardCard } from './DashboardCard';
 export function GameShort() {
   const [data, setData] = useState<any>(null);
 
-  const fetch = useCallback(async () => {
+  const doFetch = useCallback(async () => {
     try {
-      const r = await fetch('/api/v1/game/short');
+      const r = await window.fetch('/api/v1/game/short');
       const j = await r.json();
       if (j.code === 200) setData(j.data);
     } catch { /* */ }
   }, []);
 
-  useEffect(() => { fetch(); const t = setInterval(fetch, 10_000); return () => clearInterval(t); }, [fetch]);
+  useEffect(() => { doFetch(); const t = setInterval(doFetch, 10_000); return () => clearInterval(t); }, [doFetch]);
 
   const score = data?.gameScore ?? 50;
   const scoreColor = score >= 70 ? '#00B42A' : score >= 50 ? '#1677FF' : '#FF7D00';
@@ -50,15 +50,15 @@ export function GameShort() {
 export function GameLong() {
   const [data, setData] = useState<any>(null);
 
-  const fetch = useCallback(async () => {
+  const doFetch = useCallback(async () => {
     try {
-      const r = await fetch('/api/v1/game/long');
+      const r = await window.fetch('/api/v1/game/long');
       const j = await r.json();
       if (j.code === 200) setData(j.data);
     } catch { /* */ }
   }, []);
 
-  useEffect(() => { fetch(); const t = setInterval(fetch, 30_000); return () => clearInterval(t); }, [fetch]);
+  useEffect(() => { doFetch(); const t = setInterval(doFetch, 30_000); return () => clearInterval(t); }, [doFetch]);
 
   const score = data?.baseGameScore ?? 50;
   const scoreColor = score >= 70 ? '#00B42A' : score >= 50 ? '#1677FF' : '#FF7D00';

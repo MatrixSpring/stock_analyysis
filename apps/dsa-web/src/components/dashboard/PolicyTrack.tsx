@@ -8,15 +8,15 @@ import { DashboardCard } from './DashboardCard';
 export function PolicyTrack() {
   const [data, setData] = useState<any>(null);
 
-  const fetch = useCallback(async () => {
+  const doFetch = useCallback(async () => {
     try {
-      const r = await fetch('/api/v1/policy/track');
+      const r = await window.fetch('/api/v1/policy/track');
       const j = await r.json();
       if (j.code === 200) setData(j.data);
     } catch { /* */ }
   }, []);
 
-  useEffect(() => { fetch(); const t = setInterval(fetch, 60_000); return () => clearInterval(t); }, [fetch]);
+  useEffect(() => { doFetch(); const t = setInterval(doFetch, 60_000); return () => clearInterval(t); }, [doFetch]);
 
   return (
     <DashboardCard title="国家长线赛道" subtitle="政策锚定 · 长线价值" icon={<Landmark size={18} />}>

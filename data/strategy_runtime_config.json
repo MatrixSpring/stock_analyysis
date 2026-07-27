@@ -1,0 +1,187 @@
+{
+  "liyien": {
+    "name": "李义恩-长线产业主升",
+    "active": true,
+    "trade_switch": {
+      "潜伏布局": true,
+      "锁仓持有": true,
+      "错杀加仓": true,
+      "空仓观望": true
+    },
+    "min_liquidity": 0.2,
+    "max_divergence": 0.4,
+    "position": [
+      0.6,
+      0.8
+    ],
+    "hold_mode": true,
+    "last_iter_time": "",
+    "update_cycle": "季度产业逻辑更新"
+  },
+  "yuboluo": {
+    "name": "语菠萝-分歧反转低吸",
+    "active": true,
+    "trade_switch": {
+      "冰点低吸": true,
+      "回暖加仓": true,
+      "高位不接力": true,
+      "情绪风控": true
+    },
+    "min_divergence": 0.7,
+    "position": [
+      0.2,
+      0.4
+    ],
+    "reverse_mode": true,
+    "last_iter_time": "",
+    "update_cycle": "月度情绪阈值更新"
+  },
+  "xiaoyao": {
+    "name": "逍遥天哥-龙头连板加速",
+    "active": true,
+    "trade_switch": {
+      "弱转强加仓": true,
+      "龙头抱团": true,
+      "退潮空仓": false,
+      "辨识度筛选": true
+    },
+    "min_heat": 0.6,
+    "max_divergence": 0.5,
+    "position": [
+      0.4,
+      0.6
+    ],
+    "leader_mode": true,
+    "last_iter_time": "",
+    "update_cycle": "半月题材周期更新"
+  },
+  "fuzong": {
+    "name": "符总-稳健波段复利",
+    "active": true,
+    "trade_switch": {
+      "低位潜伏": true,
+      "滚动做T": true,
+      "高低切换": true,
+      "严格止损": true
+    },
+    "position": [
+      0.3,
+      0.5
+    ],
+    "roll_mode": true,
+    "low_switch": true,
+    "last_iter_time": "",
+    "update_cycle": "季度估值轮动更新"
+  },
+  "sunyucheng": {
+    "name": "孙宇成-四维量化共振",
+    "active": true,
+    "trade_switch": {
+      "共振开仓": true,
+      "机械化执行": true,
+      "因子迭代": true,
+      "结构风控": true
+    },
+    "resonance_threshold": 0.65,
+    "dynamic_pos": true,
+    "last_iter_time": "",
+    "update_cycle": "每日因子迭代"
+  },
+  "guo_jiaodui": {
+    "name": "国家队-维稳护盘",
+    "active": true,
+    "trade_switch": {
+      "危机护盘": true,
+      "权重托底": true,
+      "过热降温": true,
+      "风险避险": true
+    },
+    "panic_threshold": 0.8,
+    "safe_pos": 0.1,
+    "last_iter_time": "",
+    "update_cycle": "年度政策底线更新"
+  },
+  "shebao": {
+    "name": "社保基金-稳健价值",
+    "active": true,
+    "trade_switch": {
+      "底部潜伏": true,
+      "长期锁仓": true,
+      "高位止盈": true,
+      "避雷风控": true
+    },
+    "low_valuation_q": 0.3,
+    "position": [
+      0.3,
+      0.45
+    ],
+    "last_iter_time": "2026-07-26",
+    "update_cycle": "季度基本面更新"
+  },
+  "gongmu": {
+    "name": "公募基金-赛道主升",
+    "active": true,
+    "trade_switch": {
+      "赛道抱团": true,
+      "景气加仓": true,
+      "高低切换": true,
+      "季报调仓": true
+    },
+    "position": [
+      0.6,
+      0.8
+    ],
+    "last_iter_time": "",
+    "update_cycle": "月度景气度更新"
+  },
+  "beixiang": {
+    "name": "北向资金-聪明钱波段",
+    "active": true,
+    "trade_switch": {
+      "汇率套利": true,
+      "龙头抱团": true,
+      "流动性跟踪": true,
+      "破位止损": true
+    },
+    "fx_safe_threshold": 0.3,
+    "last_iter_time": "",
+    "update_cycle": "日度汇率流动性更新"
+  },
+  "nanxiang": {
+    "name": "南向资金-跨市场套利",
+    "active": true,
+    "trade_switch": {
+      "溢价套利": true,
+      "A股溢出布局": true,
+      "政策跟踪": true
+    },
+    "overflow_threshold": 0.7,
+    "last_iter_time": "",
+    "update_cycle": "周度溢价更新"
+  },
+  "youzi": {
+    "name": "游资-情绪题材",
+    "active": true,
+    "trade_switch": {
+      "题材点火": true,
+      "龙头博弈": true,
+      "冰点套利": true,
+      "退潮空仓": true
+    },
+    "last_iter_time": "",
+    "update_cycle": "周度情绪周期更新"
+  },
+  "sanhu": {
+    "name": "散户-情绪反向",
+    "active": true,
+    "trade_switch": {
+      "狂热反向减仓": true,
+      "恐慌反向低吸": true,
+      "拥挤避雷": true
+    },
+    "greed_threshold": 0.85,
+    "fear_threshold": 0.15,
+    "last_iter_time": "",
+    "update_cycle": "日度情绪极值更新"
+  }
+}

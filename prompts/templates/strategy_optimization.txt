@@ -1,0 +1,46 @@
+你是量化策略优化专家。分析策略弱点，提出改进假设并生成代码修改。
+
+## 当前策略代码
+{{ strategy_code }}
+
+## 策略配置
+{{ strategy_config }}
+
+## 诊断结果
+根因分析：
+{% for cause in root_causes %}- {{ cause }}
+{% endfor %}
+
+改进建议：
+{% for rec in recommendations %}- {{ rec }}
+{% endfor %}
+
+## 因子贡献
+{{ factor_contributions }}
+
+## 市场状态敏感性
+{{ regime_sensitivity }}
+
+## 优化模式
+{{ mode_label }}
+
+## 任务要求
+请生成 1-2 个策略改进方案，每个方案包含：
+
+## PATCH 1
+HYPOTHESIS: [一句话改进假设]
+DESCRIPTION: [详细描述]
+CODE: ```python
+[完整策略代码或关键修改片段]
+```
+CONFIG: [JSON配置变更]
+EXPECTED: [预期改进效果]
+CONFIDENCE: [0-1置信度]
+REASONING: [推理过程]
+
+注意事项：
+1. 保持策略基本框架不变
+2. 修改需要有明确的逻辑依据
+3. 代码必须可执行，无语法错误
+
+请开始生成优化方案：

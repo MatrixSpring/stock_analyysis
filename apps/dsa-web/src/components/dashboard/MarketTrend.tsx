@@ -18,15 +18,15 @@ export function MarketTrend() {
   const [data, setData] = useState<any>(null);
   const [timeRange, setTimeRange] = useState('7d');
 
-  const fetch = useCallback(async () => {
+  const doFetch = useCallback(async () => {
     try {
-      const r = await fetch(`/api/v1/market/trend?timeRange=${timeRange}`);
+      const r = await window.fetch(`/api/v1/market/trend?timeRange=${timeRange}`);
       const j = await r.json();
       if (j.code === 200) setData(j.data);
     } catch { /* */ }
   }, [timeRange]);
 
-  useEffect(() => { fetch(); const t = setInterval(fetch, 10_000); return () => clearInterval(t); }, [fetch]);
+  useEffect(() => { doFetch(); const t = setInterval(doFetch, 10_000); return () => clearInterval(t); }, [doFetch]);
 
   const s = data?.trendScore ?? 50;
   const scoreColor = s >= 70 ? '#00B42A' : s >= 55 ? '#1677FF' : s >= 45 ? '#FF7D00' : '#F53F3F';

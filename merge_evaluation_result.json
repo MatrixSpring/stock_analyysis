@@ -1,0 +1,453 @@
+{
+  "dimensions": [
+    {
+      "title": "多因子综合评分",
+      "before": "合并前：全部依赖 LLM 黑盒评分，无量化基准，同一只股票不同模型结果偏差大",
+      "after": "合并后：成长性(40)·盈利(30)·估值(30) 三维量化评分，可复现、可回溯",
+      "results": [
+        {
+          "code": "300274",
+          "name": "阳光电源",
+          "rev_growth": 55.0,
+          "roe": 28.0,
+          "pe": 22.0,
+          "price": 95.0,
+          "industry": "光伏",
+          "score": 69.0,
+          "rating_level": "buy",
+          "rating_label": "✅ 推荐关注",
+          "rating_color": "#3B82F6",
+          "strategy_type": "short_term",
+          "strategy_label": "短线成长"
+        },
+        {
+          "code": "300750",
+          "name": "宁德时代",
+          "rev_growth": 45.8,
+          "roe": 22.0,
+          "pe": 32.0,
+          "price": 210.0,
+          "industry": "动力电池",
+          "score": 54.3,
+          "rating_level": "buy",
+          "rating_label": "✅ 推荐关注",
+          "rating_color": "#3B82F6",
+          "strategy_type": "mid_term",
+          "strategy_label": "中线稳健"
+        },
+        {
+          "code": "600519",
+          "name": "贵州茅台",
+          "rev_growth": 15.2,
+          "roe": 30.5,
+          "pe": 28.0,
+          "price": 1680.0,
+          "industry": "白酒",
+          "score": 52.1,
+          "rating_level": "buy",
+          "rating_label": "✅ 推荐关注",
+          "rating_color": "#3B82F6",
+          "strategy_type": "watch",
+          "strategy_label": "观望"
+        },
+        {
+          "code": "002594",
+          "name": "比亚迪",
+          "rev_growth": 38.5,
+          "roe": 18.0,
+          "pe": 25.0,
+          "price": 285.0,
+          "industry": "新能源汽车",
+          "score": 50.9,
+          "rating_level": "buy",
+          "rating_label": "✅ 推荐关注",
+          "rating_color": "#3B82F6",
+          "strategy_type": "mid_term",
+          "strategy_label": "中线稳健"
+        },
+        {
+          "code": "688981",
+          "name": "中芯国际",
+          "rev_growth": 12.0,
+          "roe": 5.0,
+          "pe": 55.0,
+          "price": 48.0,
+          "industry": "半导体",
+          "score": 12.3,
+          "rating_level": "caution",
+          "rating_label": "⚠️ 谨慎",
+          "rating_color": "#EF4444",
+          "strategy_type": "watch",
+          "strategy_label": "观望"
+        }
+      ],
+      "prompt": "## 多因子综合评分（成长性·盈利能力·估值合理性）\n\n| # | 股票 | 评分 | 评级 | 策略建议 | 营收增长 | ROE | PE |\n|---|------|------|------|---------|----------|-----|----|\n| 1 | 阳光电源 | **69.0** | ✅ 推荐关注 | 短线成长 | 55.0% | 28.0% | 22.0 |\n| 2 | 宁德时代 | **54.3** | ✅ 推荐关注 | 中线稳健 | 45.8% | 22.0% | 32.0 |\n| 3 | 贵州茅台 | **52.1** | ✅ 推荐关注 | 观望 | 15.2% | 30.5% | 28.0 |\n| 4 | 比亚迪 | **50.9** | ✅ 推荐关注 | 中线稳健 | 38.5% | 18.0% | 25.0 |\n| 5 | 中芯国际 | **12.3** | ⚠️ 谨慎 | 观望 | 12.0% | 5.0% | 55.0 |\n\n> 评分维度: 成长性(40分) + 盈利能力(30分) + 估值合理性(30分)\n> 以上评分仅作研究参考，不构成任何投资建议。",
+      "top_pick": {
+        "code": "300274",
+        "name": "阳光电源",
+        "rev_growth": 55.0,
+        "roe": 28.0,
+        "pe": 22.0,
+        "price": 95.0,
+        "industry": "光伏",
+        "score": 69.0,
+        "rating_level": "buy",
+        "rating_label": "✅ 推荐关注",
+        "rating_color": "#3B82F6",
+        "strategy_type": "short_term",
+        "strategy_label": "短线成长"
+      }
+    },
+    {
+      "title": "新闻→产业链影响分析",
+      "before": "合并前：新闻原文直接喂给 LLM，无结构化影响提取",
+      "after": "合并后：自动识别 4 个受影响行业，利好/利空方向 + 影响程度 + 申万产业链回链",
+      "impacts": [
+        {
+          "article_title": "美国商务部宣布对中国半导体出口管制新规，涉及AI芯片和半导体设备",
+          "impacts": [
+            {
+              "industry": "半导体",
+              "direction": "negative",
+              "level": "medium",
+              "score": 0.3,
+              "matched_keywords": [
+                "芯片",
+                "半导体",
+                "光刻",
+                "EDA"
+              ],
+              "affected_l2_chains": [
+                "芯片设计",
+                "晶圆代工",
+                "封测",
+                "半导体设备",
+                "光刻胶",
+                "硅片"
+              ]
+            },
+            {
+              "industry": "AI算力",
+              "direction": "neutral",
+              "level": "low",
+              "score": 0.1,
+              "matched_keywords": [
+                "AI"
+              ],
+              "affected_l2_chains": [
+                "光模块/CPO",
+                "AI服务器",
+                "AI芯片",
+                "液冷散热"
+              ]
+            }
+          ],
+          "shenwan_chains": [],
+          "dominant_direction": "negative",
+          "affected_industries": [
+            "半导体",
+            "AI算力"
+          ]
+        },
+        {
+          "article_title": "欧盟拟对中国电动汽车加征最高45%反补贴关税",
+          "impacts": [
+            {
+              "industry": "新能源汽车",
+              "direction": "negative",
+              "level": "medium",
+              "score": 0.45,
+              "matched_keywords": [
+                "电动汽车",
+                "比亚迪"
+              ],
+              "affected_l2_chains": [
+                "动力电池",
+                "整车制造",
+                "充电桩",
+                "锂矿",
+                "电解液",
+                "隔膜"
+              ]
+            }
+          ],
+          "shenwan_chains": [],
+          "dominant_direction": "negative",
+          "affected_industries": [
+            "新能源汽车"
+          ]
+        },
+        {
+          "article_title": "国家大基金三期注册资本3440亿元，重点投向半导体设备和材料",
+          "impacts": [
+            {
+              "industry": "半导体",
+              "direction": "positive",
+              "level": "low",
+              "score": 0.15,
+              "matched_keywords": [
+                "半导体",
+                "集成电路",
+                "大基金",
+                "EDA"
+              ],
+              "affected_l2_chains": [
+                "芯片设计",
+                "晶圆代工",
+                "封测",
+                "半导体设备",
+                "光刻胶",
+                "硅片"
+              ]
+            }
+          ],
+          "shenwan_chains": [],
+          "dominant_direction": "positive",
+          "affected_industries": [
+            "半导体"
+          ]
+        },
+        {
+          "article_title": "隆基绿能发布BC电池效率世界纪录，量产效率突破27.3%",
+          "impacts": [
+            {
+              "industry": "光伏产业",
+              "direction": "positive",
+              "level": "low",
+              "score": 0.15,
+              "matched_keywords": [
+                "隆基",
+                "BC电池"
+              ],
+              "affected_l2_chains": [
+                "硅料",
+                "光伏玻璃",
+                "电池片",
+                "逆变器",
+                "电站",
+                "储能"
+              ]
+            }
+          ],
+          "shenwan_chains": [],
+          "dominant_direction": "positive",
+          "affected_industries": [
+            "光伏产业"
+          ]
+        }
+      ],
+      "aggregated": {
+        "industries_affected": 4,
+        "summary": [
+          {
+            "industry": "新能源汽车",
+            "net_label": "中性",
+            "net_direction": "neutral",
+            "net_score": -1,
+            "article_count": 1,
+            "avg_impact_score": 0.45
+          },
+          {
+            "industry": "光伏产业",
+            "net_label": "中性",
+            "net_direction": "neutral",
+            "net_score": 1,
+            "article_count": 1,
+            "avg_impact_score": 0.15
+          },
+          {
+            "industry": "半导体",
+            "net_label": "中性",
+            "net_direction": "neutral",
+            "net_score": 0,
+            "article_count": 2,
+            "avg_impact_score": 0.22
+          },
+          {
+            "industry": "AI算力",
+            "net_label": "中性",
+            "net_direction": "neutral",
+            "net_score": 0,
+            "article_count": 1,
+            "avg_impact_score": 0.1
+          }
+        ]
+      },
+      "prompt": "## 新闻→产业链影响分析\n\n| 行业 | 净影响 | 文章数 | 平均影响分 |\n|------|--------|--------|-----------|\n| 新能源汽车 | ⚪ 中性 (-1) | 1 | 0.45 |\n| 光伏产业 | ⚪ 中性 (+1) | 1 | 0.15 |\n| 半导体 | ⚪ 中性 (+0) | 2 | 0.22 |\n| AI算力 | ⚪ 中性 (+0) | 1 | 0.10 |\n\n> 分析覆盖 4 个行业\n\n### 新能源汽车\n- 涉及子链: 动力电池, 整车制造, 充电桩, 锂矿, 电解液\n- 关注标的: 新能源车, 电动车, EV, 电动汽车, 充电桩, 换电, 动力电池, 锂电池\n\n### 光伏产业\n- 涉及子链: 硅料, 光伏玻璃, 电池片, 逆变器, 电站\n- 关注标的: 光伏, 太阳能, 硅料, 硅片, 电池片, 组件, 逆变器, 隆基\n\n### 半导体\n- 涉及子链: 芯片设计, 晶圆代工, 封测, 半导体设备, 光刻胶\n- 关注标的: 芯片, 半导体, 集成电路, IC, 晶圆, 光刻, 刻蚀, 封测"
+    },
+    {
+      "title": "全球供应链风险预警",
+      "before": "合并前：无 GDELT 全球事件数据，地缘/供应链风险对标的的影响完全盲视",
+      "after": "合并后：3 个风险事件，综合风险等级 HIGH，受影响供应链 0 条",
+      "risk_report": {
+        "total_risk_events": 3,
+        "overall_risk_level": "high",
+        "highest_risk_stage": {
+          "stage": "midstream",
+          "label": "中游（制造/加工/组装）",
+          "score": 9
+        },
+        "stage_scores": {
+          "upstream": 6,
+          "midstream": 9,
+          "downstream": 3
+        },
+        "risk_events": [
+          {
+            "title": "US imposes new chip export controls on China",
+            "risk_type": "贸易限制/制裁",
+            "risk_level": "high",
+            "factors": [
+              "地缘政治",
+              "汇率波动",
+              "技术壁垒"
+            ],
+            "affected_stages": [
+              "upstream",
+              "midstream"
+            ],
+            "affected_chains": []
+          },
+          {
+            "title": "Houthi attacks intensify in Red Sea shipping lane",
+            "risk_type": "地缘冲突",
+            "risk_level": "high",
+            "factors": [
+              "地缘政治",
+              "交通运输"
+            ],
+            "affected_stages": [
+              "midstream",
+              "downstream"
+            ],
+            "affected_chains": []
+          },
+          {
+            "title": "EU anti-subsidy tariffs on Chinese EVs finalized at up to 45%",
+            "risk_type": "贸易限制/制裁",
+            "risk_level": "high",
+            "factors": [
+              "地缘政治",
+              "汇率波动",
+              "技术壁垒"
+            ],
+            "affected_stages": [
+              "upstream",
+              "midstream"
+            ],
+            "affected_chains": []
+          }
+        ],
+        "affected_chains_count": 0,
+        "affected_chains": [],
+        "stock_chain_risks": []
+      },
+      "prompt": "## 🔴 全球供应链风险预警（GDELT 事件监测）\n\n- **综合风险等级**: HIGH\n- **风险事件数**: 3\n- **最高风险阶段**: 中游（制造/加工/组装）\n- **受影响的申万产业链**: 0 条\n\n### 供应链各阶段风险评分\n- 上游（原材料/初级产品）: ██████ (6)\n- 中游（制造/加工/组装）: █████████ (9)\n- 下游（分销/物流/终端）: ███ (3)\n\n### 近期风险事件\n1. 🔴 [贸易限制/制裁] US imposes new chip export controls on China\n2. 🔴 [地缘冲突] Houthi attacks intensify in Red Sea shipping lane\n3. 🔴 [贸易限制/制裁] EU anti-subsidy tariffs on Chinese EVs finalized at up to 45%\n\n> 数据来源：GDELT 全球事件数据库 + 申万产业链台账"
+    },
+    {
+      "title": "博弈论多空博弈分析",
+      "before": "合并前：无博弈视角，只看技术面和基本面",
+      "after": "合并后：5 类市场参与者画像 + 4 种主力行为模式 → LLM 博弈分析 prompt",
+      "participants": [
+        {
+          "角色": "散户",
+          "权重": "10%",
+          "特征": "追涨杀跌，情绪驱动，羊群效应明显。成交量放大时往往在顶部追入，缩量下跌时恐慌卖出。"
+        },
+        {
+          "角色": "游资/热钱",
+          "权重": "20%",
+          "特征": "短线快进快出，追逐题材热点，制造高位换手。龙虎榜席位频繁出现，涨停板封单快速变化。"
+        },
+        {
+          "角色": "公募/机构",
+          "权重": "35%",
+          "特征": "基本面驱动，长期持有，左侧布局。季报持仓变化缓慢，偏好大盘蓝筹和成长白马。"
+        },
+        {
+          "角色": "北向资金",
+          "权重": "25%",
+          "特征": "外资风格，偏好消费/金融/新能源龙头。持续净流入/流出反映外资对 A 股的系统性看法。"
+        },
+        {
+          "角色": "产业资本",
+          "权重": "10%",
+          "特征": "增减持、回购、股权激励。大股东增持是强信心信号，减持则需警惕。"
+        }
+      ],
+      "patterns": [
+        {
+          "阶段": "吸筹阶段",
+          "含义": "逢低布局窗口，可跟随主力分批建仓。注意：主力吸筹可能持续数周到数月，需要耐心。"
+        },
+        {
+          "阶段": "洗盘阶段",
+          "含义": "不要被洗出局。如果基本面和技术面支撑未变，洗盘是加仓机会而非止损信号。"
+        },
+        {
+          "阶段": "拉升阶段",
+          "含义": "顺势持有，但需要设定移动止盈。拉升末期往往伴随巨量换手，注意高位放量滞涨信号。"
+        },
+        {
+          "阶段": "出货阶段",
+          "含义": "危险信号！应考虑减仓或清仓。不要在高位接盘。"
+        }
+      ],
+      "prompt_excerpt": "## 博弈论多空博弈分析\n\n### 分析标的\n- 代码: 300750\n- 名称: 宁德时代\n\n### 当前市场数据\n- 当前价格: 210.00 元\n- 成交量: 125000 手\n- 换手率: 2.35%\n- 北向资金净流向: -2.15 亿元\n- 龙虎榜净买入: +8500 万元\n\n### 市场参与者画像\n- **散户**（权重 10%）：追涨杀跌，情绪驱动，羊群效应明显。成交量放大时往往在顶部追入，缩量下跌时恐慌卖出。\n- **游资/热钱**（权重 20%）：短线快进快出，追逐题材热点，制造高位换手。龙虎榜席位频繁出现，涨停板封单快速变化。\n- **公募/机构**（权重 35%）：基本面驱动，长期持有，左侧布局。季报持仓变化缓慢，偏好大盘蓝筹和成长白马。\n- **北向资金**（权重 25%）：外资风格，偏好消费/金融/新能源龙头。持续净流入/流出反映外资对 A 股的系统性看法。\n- **产业资本**（权重 10%）：增减持、回购、股权激励。大股东增持是强信心信号，减持则需警惕。\n\n### 主力资金行为模式\n- **吸筹阶段**：主力在低位区域缓慢建仓，成交量温和放大但不张扬，股..."
+    },
+    {
+      "title": "跨平台热搜趋势",
+      "before": "合并前：无热搜信号，无法感知市场情绪方向",
+      "after": "合并后：覆盖 14 个平台热榜，默认拉取 6 个金融相关平台",
+      "platforms": {
+        "toutiao": "头条热榜",
+        "baidu": "百度热搜",
+        "weibo": "微博热搜",
+        "wallstreetcn": "华尔街见闻",
+        "cls": "财联社",
+        "36kr": "36氪"
+      }
+    },
+    {
+      "title": "GDELT 全球事件数据",
+      "before": "合并前：无外部事件数据，完全依赖本地新闻搜索",
+      "after": "合并后：5 个预定义监控主题，每15分钟更新的全球事件数据库",
+      "queries": {
+        "supply_chain": "GDELT-供应链",
+        "geopolitics": "GDELT-地缘",
+        "energy": "GDELT-能源",
+        "semiconductor": "GDELT-半导体",
+        "shipping": "GDELT-航运"
+      }
+    },
+    {
+      "title": "申万产业链映射",
+      "before": "合并前：无产业链结构化数据，无法分析上下游传导",
+      "after": "合并后：12 个影响因素维度，当前已载入 1 个一级行业（完整的346条可通过追加触发）",
+      "factors": [
+        "地缘政治",
+        "交通运输",
+        "气象灾害",
+        "技术壁垒",
+        "金融资金",
+        "政策监管",
+        "原材料",
+        "企业管理",
+        "供需格局",
+        "环保双碳",
+        "汇率波动",
+        "季节周期"
+      ],
+      "transport_affected": 11,
+      "keyword_hits": []
+    }
+  ],
+  "prompt_enrichment": {
+    "before_sections": 1,
+    "after_sections": 4,
+    "before_chars": 75,
+    "after_chars": 2307,
+    "enrichment_ratio": 30.8
+  },
+  "total_dimensions_enhanced": "7/7"
+}

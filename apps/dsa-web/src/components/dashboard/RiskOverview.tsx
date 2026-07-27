@@ -13,15 +13,15 @@ const riskColors: Record<string, string> = {
 export function RiskOverview() {
   const [data, setData] = useState<any>(null);
 
-  const fetch = useCallback(async () => {
+  const doFetch = useCallback(async () => {
     try {
-      const r = await fetch('/api/v1/risk/overview');
+      const r = await window.fetch('/api/v1/risk/overview');
       const j = await r.json();
       if (j.code === 200) setData(j.data);
     } catch { /* */ }
   }, []);
 
-  useEffect(() => { fetch(); const t = setInterval(fetch, 10_000); return () => clearInterval(t); }, [fetch]);
+  useEffect(() => { doFetch(); const t = setInterval(doFetch, 10_000); return () => clearInterval(t); }, [doFetch]);
 
   const stats = data?.riskStat || {};
   const total = Object.values(stats).reduce((a: number, b: any) => a + (b as number), 0) || 1;

@@ -2,7 +2,7 @@
  * v2.1.0 数据溯源弹窗 — 展示指标计算原始数据、算法版本、后端日志
  * 布局：上半区标的基础信息 + 下半区原始数据/日志明细
  */
-import type React from 'react';
+
 import { X, FileText, Cpu } from 'lucide-react';
 
 interface Props {

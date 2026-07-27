@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, Check, LayoutDashboard, SlidersHorizontal, X } from 'lucide-react';
+import { BarChart3, Check, SlidersHorizontal, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SystemStatusBar } from '../components/dashboard/SystemStatusBar';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
