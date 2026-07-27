@@ -30,6 +30,11 @@ const StrategyCenterPage = lazy(() => import('./pages/StrategyCenterPage'));
 const GameEnginePage = lazy(() => import('./pages/GameEnginePage'));
 const ResearchPlatformPage = lazy(() => import('./pages/ResearchPlatformPage'));
 const RiskPerformancePage = lazy(() => import('./pages/RiskPerformancePage'));
+const FundFlowTopology = lazy(() => import('./pages/visuals/FundFlowTopology'));
+const ParticipantGraph = lazy(() => import('./pages/visuals/ParticipantGraph'));
+const GeoEventTopology = lazy(() => import('./pages/visuals/GeoEventTopology'));
+const DimensionTree = lazy(() => import('./pages/visuals/DimensionTree'));
+const IndustryChainTopology = lazy(() => import('./pages/visuals/IndustryChainTopology'));
 const LegacyHubPage = lazy(() => import('./pages/LegacyHubPage'));
 
 const AppContent: React.FC = () => {
@@ -82,6 +87,11 @@ const AppContent: React.FC = () => {
     <Routes>
         <Route element={<AdminLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/visuals/fund-flow" element={<FundFlowTopology />} />
+          <Route path="/visuals/participant" element={<ParticipantGraph />} />
+          <Route path="/visuals/geo-event" element={<GeoEventTopology />} />
+          <Route path="/visuals/dimension-tree" element={<DimensionTree />} />
+          <Route path="/visuals/industry-chain" element={<IndustryChainTopology />} />
           <Route path="/auto-strategy" element={<DashboardPage />} />
           <Route path="/old" element={<LegacyHubPage />} />
           <Route path="/strategy-center" element={<StrategyCenterPage />} />
