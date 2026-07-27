@@ -2978,3 +2978,93 @@ textarea {
 @media screen and (max-width: 768px) {
   .dashboard-grid-6 { grid-template-columns: 1fr; }
 }
+
+/* =========================================
+   8. v3.0 CYBER-FINANCE DESIGN SYSTEM
+   ========================================= */
+:root {
+  --cyber-bg-deep: #080C18;
+  --cyber-bg-card: #0F172A;
+  --cyber-bg-glass: rgba(18,28,48,0.95);
+  --cyber-blue: #1677FF;
+  --cyber-green: #36CFC9;
+  --cyber-red: #F53F3F;
+  --cyber-amber: #FAAD14;
+  --cyber-border: rgba(64,150,255,0.15);
+  --cyber-glow: 0 0 20px rgba(22,119,255,0.25);
+  --cyber-green-glow: 0 0 16px rgba(54,207,201,0.2);
+  --cyber-red-glow: 0 0 16px rgba(245,63,63,0.2);
+}
+
+/* Glass card */
+.glass-card {
+  background: var(--cyber-bg-glass);
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  border: 1px solid var(--cyber-border);
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3), var(--cyber-glow);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.glass-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 28px rgba(22,119,255,0.15);
+}
+
+/* Glow borders */
+.glow-blue { box-shadow: var(--cyber-glow); }
+.glow-green { box-shadow: var(--cyber-green-glow); }
+.glow-red { box-shadow: var(--cyber-red-glow); }
+
+/* Pulse animation for alerts */
+@keyframes cyber-pulse {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.cyber-pulse { animation: cyber-pulse 2s ease-in-out infinite; }
+
+/* Scan line loading */
+@keyframes scan-line {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(400%); }
+}
+.scan-loading {
+  position: relative; overflow: hidden;
+}
+.scan-loading::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0;
+  height: 2px; background: linear-gradient(90deg,transparent,var(--cyber-blue),transparent);
+  animation: scan-line 1.5s ease-in-out infinite;
+}
+
+/* Number scroll transition */
+@keyframes number-roll {
+  from { opacity: 0.6; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.data-refresh { animation: number-roll 0.3s ease-out; }
+
+/* Page transitions */
+@keyframes fade-slide-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.page-enter { animation: fade-slide-in 0.25s ease-out; }
+
+/* Node glow for ECharts (applied via CSS vars in chart options) */
+.node-glow-strong { filter: drop-shadow(0 0 8px rgba(22,119,255,0.6)); }
+.node-glow-medium { filter: drop-shadow(0 0 4px rgba(22,119,255,0.35)); }
+.node-glow-weak { filter: drop-shadow(0 0 2px rgba(22,119,255,0.15)); }
+
+/* Score gradient bar */
+.score-bar {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--cyber-red), var(--cyber-amber), var(--cyber-green));
+}
+.score-fill {
+  height: 100%; border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+/* Tooltip z-layer lock */
+.cyber-tooltip { z-index: 9999 !important; position: relative; }
