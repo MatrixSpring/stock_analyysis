@@ -82,6 +82,7 @@ const AppContent: React.FC = () => {
     <Routes>
         <Route element={<AdminLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/auto-strategy" element={<DashboardPage />} />
           <Route path="/old" element={<LegacyHubPage />} />
           <Route path="/strategy-center" element={<StrategyCenterPage />} />
           <Route path="/game-engine" element={<GameEnginePage />} />

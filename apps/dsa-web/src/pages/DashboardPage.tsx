@@ -25,6 +25,7 @@ function LegacyToolsBar() {
     { to: '/portfolio', icon: Shield, label: '自选股' },
     { to: '/alerts', icon: AlertTriangle, label: '告警' },
     { to: '/settings', icon: Settings, label: '设置' },
+    { to: '/auto-strategy', icon: Zap, label: '全自动策略中心' },
   ];
 
   return (
