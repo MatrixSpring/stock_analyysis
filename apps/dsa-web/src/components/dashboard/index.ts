@@ -5,3 +5,4 @@ export { RecentStock } from './RecentStock';
 export { RiskOverview } from './RiskOverview';
 export { PolicyTrack } from './PolicyTrack';
 export { GameShort, GameLong } from './GamePanel';
+export { DataTraceModal } from './DataTraceModal';
