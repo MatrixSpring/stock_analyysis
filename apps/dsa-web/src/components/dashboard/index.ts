@@ -11,3 +11,4 @@ export { DataTraceModal } from './DataTraceModal';
 // 保留原有导出（TaskPanel / HomeStockWorkspace / ChatPage / HomePage 依赖）
 export { DashboardPanelHeader } from './DashboardPanelHeader';
 export { DashboardStateBlock } from './DashboardStateBlock';
+export { ModuleHeader } from './ModuleHeader';
