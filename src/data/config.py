@@ -34,8 +34,10 @@ CACHE_TTL_FUNDAMENTAL: int = 300    # 财务 5 分钟
 # 失败黑名单（P1）
 # ============================================================
 
-FAIL_BLACKLIST_COOLDOWN: float = 180.0  # 冷却秒数
-FAIL_BLACKLIST_MAX_RETRY: int = 2       # 最大重试次数
+FAIL_BLACKLIST_COOLDOWN: float = 180.0
+FAIL_BLACKLIST_MAX_RETRY: int = 2
+BLACKLIST_CLEAN_INTERVAL: int = 3600    # 黑名单定时清扫周期 1小时
+INDUSTRY_REFRESH_INTERVAL: int = 86400  # 行业字典每日热更新一次
 
 # ============================================================
 # 数据清洗 & 过滤
@@ -45,8 +47,11 @@ MIN_STOCK_DAYS: int = 20
 PE_UPPER_LIMIT: float = 300.0
 PE_LOWER_LIMIT: float = 0.0
 GROWTH_EXTREME_LIMIT: float = 200.0
-UP_LIMIT_RATIO: float = 0.095
-DOWN_LIMIT_RATIO: float = -0.095
+
+# 动态涨跌停阈值（P0：主板10% / 创业板300 20% / 科创板688 20%）
+STOCK_LIMIT_RULE: dict = {"main": 0.095, "growth": 0.195, "star": 0.195}
+MIN_VALID_CLOSE_RATIO: float = 0.9   # 次新有效收盘价占比阈值
+MIN_TRADE_VOLUME: float = 1000       # 最小有效成交量，过滤僵尸股
 
 # ============================================================
 # 技术指标
@@ -56,6 +61,9 @@ RSI_DEFAULT_PERIOD: int = 14
 RSI_MIN_PERIOD: int = 5
 VOL_RATIO_DAYS: int = 5
 TTM_QUARTERS: int = 4
+FINANCIAL_OUTLIER_THRESHOLD: float = 150.0  # 单季度异常峰值压制阈值
+FINANCIAL_SMOOTH_RATIO: float = 0.7         # 季节性平滑系数
+RSI_SMOOTH_WEIGHT: float = 0.85            # 小样本 RSI 平滑权重
 
 # ============================================================
 # Baostock 心跳

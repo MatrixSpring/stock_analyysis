@@ -33,8 +33,11 @@ from src.data.config import (
     NORTH_BOUND_FIELD_NAMES,
     INDUSTRY_RETRY_TIMES, INDUSTRY_RETRY_SLEEP, INDUSTRY_DEFAULT_NAME,
     STATIC_INDUSTRY_BACKUP,
-    FAIL_BLACKLIST_COOLDOWN, FAIL_BLACKLIST_MAX_RETRY,
-    BS_HEARTBEAT_INTERVAL, UP_LIMIT_RATIO, DOWN_LIMIT_RATIO,
+    FAIL_BLACKLIST_COOLDOWN, FAIL_BLACKLIST_MAX_RETRY, BLACKLIST_CLEAN_INTERVAL,
+    INDUSTRY_REFRESH_INTERVAL,
+    BS_HEARTBEAT_INTERVAL,
+    STOCK_LIMIT_RULE, MIN_VALID_CLOSE_RATIO, MIN_TRADE_VOLUME,
+    FINANCIAL_OUTLIER_THRESHOLD, FINANCIAL_SMOOTH_RATIO, RSI_SMOOTH_WEIGHT,
     TTM_QUARTERS,
 )
 from src.data.global_stat import GlobalStat
@@ -195,6 +198,82 @@ def _mark_fail(code: str):
         _FAIL_BLACKLIST[code] = time.time() + FAIL_BLACKLIST_COOLDOWN
         logger.warning(f"[DataLoader] {code} 加入黑名单 {FAIL_BLACKLIST_COOLDOWN}s")
 
+
+# ---- v2.1.0 黑名单定时清扫 + 行业热更新 ----
+_BLACKLIST_LAST_CLEAN: float = 0.0
+_INDUSTRY_LAST_REFRESH: float = time.time()
+_INDUSTRY_MAP_ACTIVE: Dict[str, str] = dict(STATIC_INDUSTRY_BACKUP)
+
+
+def _auto_clean_blacklist():
+    """P1: 定时清扫过期黑名单"""
+    global _BLACKLIST_LAST_CLEAN
+    now = time.time()
+    if now - _BLACKLIST_LAST_CLEAN < BLACKLIST_CLEAN_INTERVAL:
+        return
+    expired = [k for k, v in _FAIL_BLACKLIST.items() if now > v]
+    for k in expired:
+        del _FAIL_BLACKLIST[k]
+        _FAIL_COUNTS.pop(k, None)
+    _BLACKLIST_LAST_CLEAN = now
+    if expired:
+        logger.debug(f"[DataLoader] 黑名单清扫: {len(expired)} 个标的解封")
+
+
+def _hot_refresh_industry():
+    """P1: 行业字典热更新（每日一次，无感刷新）"""
+    global _INDUSTRY_MAP_ACTIVE, _INDUSTRY_LAST_REFRESH
+    now = time.time()
+    if now - _INDUSTRY_LAST_REFRESH < INDUSTRY_REFRESH_INTERVAL:
+        return
+    if not _ak_available:
+        return
+    try:
+        df = ak.stock_zh_a_industry(timeout=REQUEST_TIMEOUT)
+        if df is not None and not df.empty:
+            new_map = {str(row["代码"]).strip(): str(row["行业"]).strip()
+                       for _, row in df.iterrows()}
+            _INDUSTRY_MAP_ACTIVE = new_map
+            _INDUSTRY_LAST_REFRESH = now
+            logger.info(f"[DataLoader] 行业字典热更新: {len(new_map)} 只")
+    except Exception:
+        pass
+
+
+# ---- v2.1.0 动态涨跌停 + 数据校验 ----
+
+def _get_limit_ratio(code: str) -> float:
+    """P0: 动态涨跌停阈值 — 主板10% / 创业板300 20% / 科创板688 20%"""
+    code = str(code).strip()
+    if code.startswith("300"):
+        return STOCK_LIMIT_RULE["growth"]
+    if code.startswith("688"):
+        return STOCK_LIMIT_RULE["star"]
+    return STOCK_LIMIT_RULE["main"]
+
+
+def _is_suspend_or_limit(df, code: str):
+    """P0: 停牌 + 动态涨跌停判定"""
+    sf = StockDataLoader._safe_float
+    last = df.iloc[-1]
+    o = sf(last.get("开盘") or last.get("open"))
+    c = sf(last.get("收盘") or last.get("close"))
+    pre = sf(last.get("昨收") or last.get("pre_close"))
+    if o == c == pre and o > 0:
+        return True, False  # 停牌
+    if pre == 0:
+        return False, False
+    change = (c - pre) / pre
+    limit = _get_limit_ratio(code)
+    return False, change >= limit or change <= -limit
+
+
+def _check_valid_data(df) -> bool:
+    """P0: 次新股有效数据占比校验"""
+    col = "收盘" if "收盘" in df.columns else "close"
+    close = df[col].dropna()
+    return len(close) / max(len(df), 1) >= MIN_VALID_CLOSE_RATIO
+
 # ============================================================
 # 行业字典初始化（3 次重试 + 静态库兜底）
 # ============================================================
@@ -339,14 +418,13 @@ class StockDataLoader:
     def calc_safe_rsi(close_series: pd.Series, period: int = 14) -> float:
         """工业级安全 RSI：全场景防除零 / NaN / Inf。
 
-        S1 升级：数据不足 RSI_DEFAULT_PERIOD 日时自动降级可用周期，
-        解决次新股打分失真问题。
+        S1 升级：数据不足 RSI_DEFAULT_PERIOD 日时自动降级可用周期。
+        v2.1.0: 小样本 RSI 平滑降噪（RSI_SMOOTH_WEIGHT）。
         """
         try:
             data_len = len(close_series)
             if data_len < RSI_MIN_PERIOD:
                 return 50.0
-            # 动态适配周期：次新股不足标准周期时用可用长度
             win = period if data_len >= period else max(RSI_MIN_PERIOD, data_len - 1)
             close = close_series.astype(float)
             delta = close.diff()
@@ -357,9 +435,13 @@ class StockDataLoader:
             if np.isnan(g_avg): g_avg = 0.0
             if np.isnan(l_avg): l_avg = 0.0
             if l_avg == 0.0:
-                return 85.0 if g_avg > 0 else 50.0
-            rsi = 100.0 - (100.0 / (1.0 + g_avg / l_avg))
-            return round(max(0.0, min(100.0, rsi)), 2)
+                raw = 85.0 if g_avg > 0 else 50.0
+            else:
+                raw = 100.0 - (100.0 / (1.0 + g_avg / l_avg))
+            # v2.1.0: 小样本平滑（向中性 50 靠拢）
+            if data_len < period:
+                raw = raw * RSI_SMOOTH_WEIGHT + 50.0 * (1 - RSI_SMOOTH_WEIGHT)
+            return round(max(0.0, min(100.0, raw)), 2)
         except Exception:
             return 50.0
 
@@ -368,6 +450,7 @@ class StockDataLoader:
     # ============================================================
 
     def get_kline_indicators(self, code: str) -> Dict[str, Any]:
+        _auto_clean_blacklist()  # v2.1.0: 定时清扫
         key = f"kline_{code}"
         cached = _CACHE.get(key)
         if cached:
@@ -404,8 +487,19 @@ class StockDataLoader:
             timeout=_REQUEST_TIMEOUT,
         )
         if df is None or df.empty or len(df) < _MIN_STOCK_DAYS:
-            return _kline_template()  # 次新/数据不足 → 模板兜底
-        return self._compute_kline_indicators(df.tail(20))
+            return _kline_template()
+        # v2.1.0: 仅取最近 20 根（去除冗余下载）
+        df = df.tail(20).reset_index(drop=True)
+        # v2.1.0: 次新有效数据校验 + 零成交量过滤 + 停牌/涨跌停
+        if not _check_valid_data(df):
+            return _kline_template()
+        vol_last = _safe_float(df["成交量"].iloc[-1] if "成交量" in df.columns else df["volume"].iloc[-1])
+        if vol_last < MIN_TRADE_VOLUME:
+            return _kline_template()
+        is_suspend, _ = _is_suspend_or_limit(df, code)
+        if is_suspend:
+            return _kline_template()
+        return self._compute_kline_indicators(df)
 
     def _kline_from_baostock(self, code: str) -> Dict[str, Any]:
         bs_code, _ = self._normalize_code(code)
@@ -569,15 +663,18 @@ class StockDataLoader:
 
                 # TTM 同比增速
                 if last_rev != 0:
-                    rev_ttm = round(
-                        (curr_rev - last_rev) / abs(last_rev) * 100, 2
-                    )
+                    raw_rev = (curr_rev - last_rev) / abs(last_rev) * 100
+                    # v2.1.0: 季节性极值平滑
+                    if abs(raw_rev) > FINANCIAL_OUTLIER_THRESHOLD:
+                        raw_rev *= FINANCIAL_SMOOTH_RATIO
+                    rev_ttm = round(raw_rev, 2)
                 if last_profit != 0:
-                    raw_profit_ttm = (curr_profit - last_profit) / abs(last_profit) * 100
-                    # P2: 去年亏损今年盈利 → 正向修复，避免爆值
+                    raw_p = (curr_profit - last_profit) / abs(last_profit) * 100
                     if last_profit < 0 and curr_profit > 0:
-                        raw_profit_ttm = min(raw_profit_ttm, GROWTH_EXTREME_LIMIT * 0.75)
-                    profit_ttm = round(raw_profit_ttm, 2)
+                        raw_p = min(raw_p, GROWTH_EXTREME_LIMIT * 0.75)
+                    if abs(raw_p) > FINANCIAL_OUTLIER_THRESHOLD:
+                        raw_p *= FINANCIAL_SMOOTH_RATIO
+                    profit_ttm = round(raw_p, 2)
 
                 # 极值压制
                 rev_ttm = max(-GROWTH_EXTREME_LIMIT, min(GROWTH_EXTREME_LIMIT, rev_ttm))
@@ -609,6 +706,10 @@ class StockDataLoader:
     # ============================================================
 
     def get_industry(self, code: str) -> str:
+        # v2.1.0: 自动热更新 + 降级全局字典
+        _hot_refresh_industry()
+        if _INDUSTRY_MAP_ACTIVE:
+            return _INDUSTRY_MAP_ACTIVE.get(str(code).strip(), INDUSTRY_DEFAULT_NAME)
         return INDUSTRY_CODE_MAP.get(str(code).strip(), INDUSTRY_DEFAULT_NAME)
 
     # ============================================================
