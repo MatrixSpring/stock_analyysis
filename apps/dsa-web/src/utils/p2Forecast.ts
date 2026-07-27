@@ -70,3 +70,31 @@ export function calcIndustryProsperity(base:{stock:number;price:number;policy:nu
   const tag=(v:number)=>v>70?'高景气上行':v>45?'中性震荡':'景气下行';
   return {short:{score:short,tag:tag(short),cycle:'1月'},mid:{score:mid,tag:tag(mid),cycle:'半年'},long:{score:long,tag:tag(long),cycle:'1年'},turnTip:short<40&&mid>60?'短期底部，中期拐点向上':'趋势延续'};
 }
+
+/** P3: 市场风格自适应动态权重 */
+interface MarketFactor { isBull?:boolean; isBear?:boolean; isShock?:boolean; isThemeHot?:boolean; isValueStyle?:boolean }
+
+export function getMarketStyleAdaptiveWeight(cycle: Cycle, mf: MarketFactor) {
+  const base = { ...CYCLE_WEIGHTS[cycle] };
+  if (mf.isBull)      { base.fund+=0.10; base.industry+=0.05; base.opinion-=0.05; }
+  if (mf.isBear)      { base.macro+=0.10; base.opinion+=0.05; base.fund-=0.05; }
+  if (mf.isShock)     { base.fund+=0.02; base.game+=0.03; base.opinion+=0.03; }
+  if (mf.isThemeHot)  { base.game+=0.08; base.opinion+=0.07; base.industry-=0.05; }
+  if (mf.isValueStyle){ base.industry+=0.10; base.macro+=0.05; base.game-=0.05; }
+  const t = Object.values(base).reduce((a:number,b:number)=>a+b,0);
+  (Object.keys(base) as (keyof typeof base)[]).forEach(k => { base[k] = +((base[k] / t).toFixed(2)); });
+  return base;
+}
+
+/** P3: 行情联动实时预测刷新 */
+export function refreshForecastRealTime(marketData: any, renderFn: (opt: any) => void) {
+  const cycles: Cycle[] = ['w1','d15','m1','m6','y1'];
+  const results: Record<string,any> = {};
+  cycles.forEach(c => { results[c] = getFullCycleForecast(marketData.factors, c); });
+  renderFn({ cycles: results, history: marketData.history });
+}
+
+/** P3: 产业链基本面穿透打分 */
+export function calcIndustryFundamentalScore(fin: { revenueRate:number; profitRate:number; grossRate:number; roe:number; inventoryRate:number }) {
+  return Math.floor(fin.revenueRate*0.25 + fin.profitRate*0.3 + fin.grossRate*0.2 + fin.roe*0.15 + (100-fin.inventoryRate)*0.1);
+}
