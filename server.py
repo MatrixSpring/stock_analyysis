@@ -19,6 +19,7 @@ Daily Stock Analysis - FastAPI 后端服务入口
 """
 
 import logging
+import os
 
 from src.config import setup_env, get_config
 from src.logging_config import setup_logging
