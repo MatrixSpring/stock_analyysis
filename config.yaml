@@ -58,3 +58,22 @@ github_models:
   # 灰度策略
   gradual_rollout_pct: 0               # 0=仅测试, 100=全量
   cache_ttl_minutes: 720               # 相同标的缓存12小时
+
+# LiteLLM 本地网关：统一代理豆包(主) + DeepSeek(备)
+# 网关启动：litellm --config litellm_config.yaml --port 4000
+litellm_gateway:
+  enabled: true
+  port: 4000
+  master_key: "sk-litellm-local"
+  primary:
+    provider: ark                             # 火山引擎 ARK
+    model: doubao-seed-code                   # 豆包代码模型
+    api_base: "https://ark.cn-beijing.volces.com/api/v3"
+  fallback:
+    provider: deepseek
+    model: deepseek-chat
+  model_list:
+    - doubao-seed-code                        # 主推演
+    - doubao-seed-2.0-lite                   # 轻量快速
+    - deepseek-chat                           # 备用推理
+    - deepseek-reasoner                       # 深度推理备用

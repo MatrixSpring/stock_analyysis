@@ -30,6 +30,11 @@ data/cache/
 .env
 !.env.example
 
+# LiteLLM runtime
+litellm.db
+litellm.db-shm
+litellm.db-wal
+
 # Reports (generated)
 reports/*.md
 reports/*.html

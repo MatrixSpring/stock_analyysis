@@ -1,0 +1,79 @@
+# ============================================================
+# LiteLLM 本地协议转换网关配置
+# 作用：统一代理豆包 + DeepSeek API，提供 OpenAI 兼容接口
+# 启动：litellm --config litellm_config.yaml --port 4000
+# ============================================================
+
+general_settings:
+  master_key: sk-litellm-local
+  database_url: "sqlite:///litellm.db"
+
+model_list:
+  # ============================================================
+  # 主模型：豆包 (Doubao) Seed-Code — 火山引擎 ARK
+  # ============================================================
+  - model_name: doubao-seed-code
+    litellm_params:
+      model: ark/ep-20260728215601-kddww
+      api_key: "${ARK_API_KEY}"
+      api_base: "https://ark.cn-beijing.volces.com/api/v3"
+      timeout: 120
+      max_retries: 3
+      temperature: 0.3
+    model_info:
+      tier: primary
+      description: "豆包代码模型 - 火山引擎 ARK"
+
+  - model_name: doubao-seed-2.0-lite
+    litellm_params:
+      model: ark/doubao-seed-2.0-lite
+      api_key: "${ARK_API_KEY}"
+      api_base: "https://ark.cn-beijing.volces.com/api/v3"
+      timeout: 120
+      max_retries: 3
+      temperature: 0.3
+    model_info:
+      tier: primary
+      description: "豆包轻量模型 - 快速推演"
+
+  # ============================================================
+  # 备用模型：DeepSeek — 当 Doubao 不可用时的 fallback
+  # ============================================================
+  - model_name: deepseek-chat
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: "${DEEPSEEK_API_KEY}"
+      timeout: 120
+      max_retries: 3
+      temperature: 0.3
+    model_info:
+      tier: fallback
+      description: "DeepSeek V3 - 备用推理"
+
+  - model_name: deepseek-reasoner
+    litellm_params:
+      model: deepseek/deepseek-reasoner
+      api_key: "${DEEPSEEK_API_KEY}"
+      timeout: 180
+      max_retries: 3
+      temperature: 0.1
+    model_info:
+      tier: fallback
+      description: "DeepSeek R1 - 深度推理备用"
+
+litellm_settings:
+  drop_params: true
+  set_verbose: true
+  request_timeout: 180
+  num_retries: 3
+  fallbacks:
+    # doubao-seed-code 失败 → 降级到 deepseek-chat
+    - doubao-seed-code: ["deepseek-chat"]
+    # doubao-seed-2.0-lite 失败 → 降级到 deepseek-chat
+    - doubao-seed-2.0-lite: ["deepseek-chat"]
+
+router_settings:
+  routing_strategy: "latency-based-routing"
+  allowed_fails: 3
+  num_retries: 3
+  cooldown_time: 30
