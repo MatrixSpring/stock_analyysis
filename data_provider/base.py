@@ -2216,8 +2216,11 @@ class DataFetcherManager:
         candidate_fetchers = []
         # 直接遍历管理器已经按 priority 排好序的数据源列表
         for fetcher in self._get_fetchers_snapshot():
-            # 只处理实现了筹码分布逻辑的数据源
-            if not hasattr(fetcher, 'get_chip_distribution'):
+            # 只处理覆盖了筹码分布逻辑的数据源（基类签名不同，不能直接调用）
+            if (
+                not hasattr(fetcher, 'get_chip_distribution')
+                or type(fetcher).get_chip_distribution is BaseFetcher.get_chip_distribution
+            ):
                 continue
 
             fetcher_name = fetcher.name
