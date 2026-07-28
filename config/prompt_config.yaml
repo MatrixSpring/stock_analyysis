@@ -1,0 +1,43 @@
+# ============================================================
+# stock_analyysis 全部Prompt统一托管
+# 修改后无需重启，运行中动态加载
+# ============================================================
+
+stock_analysis_prompt: |
+  你是专业股票量化分析师，根据下面行情、资金、行业数据进行综合研判。
+  输入信息：{stock_info}
+  输出严格JSON格式，包含字段：
+    trend: str 看多/看空/震荡
+    score: float 0~1
+    risk_level: str 低/中/高
+    reason: list[str]
+    key_observation: str 关键观测信号
+
+multi_model_consensus_prompt: |
+  多个AI模型给出独立分析结论：{model_results}
+  综合所有观点，生成共识研判结果，输出JSON：
+  {
+    "consensus_score": float 0~1,
+    "trend": "up|down|oscillation",
+    "confidence": float 0~1,
+    "diverge_level": int 0~2,
+    "model_comparison": [{"name":"","score":0,"weight":0}],
+    "summary": "共识摘要"
+  }
+
+news_analysis_prompt: |
+  你是资深机构投研分析师。分析以下财经新闻对产业链的影响。
+  新闻原文：{news_text}
+  相关标的：{related_stocks}
+  输出JSON包含 event_meta, multi_factor_analysis, transfer_chain, stock_impact。
+
+backtest_strategy_prompt: |
+  你是量化策略分析师。根据回测结果评估策略有效性。
+  回测数据：{backtest_result}
+  输出JSON包含 strategy_assessment, risk_warning, improvement_suggestions。
+
+stock_screening_prompt: |
+  根据以下因子得分和行业数据，筛选最优标的组合。
+  候选标的：{candidate_stocks}
+  筛选条件：{filter_condition}
+  输出JSON包含 selected_stocks, selection_logic, risk_diversification。

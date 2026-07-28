@@ -1,0 +1,46 @@
+# ============================================================
+# stock_analyysis 全局中心化配置
+# ============================================================
+
+# 数据源配置
+DATA_SOURCE_CONF:
+  priority:
+    - akshare
+    - tushare
+    - yfinance
+    - efinance
+  timeout: 15
+  retry_times: 2
+  default_adjust: "qfq"  # 默认前复权
+
+# LLM 模型配置
+LLM_CONF:
+  max_context_tokens: 12000
+  rate_limit_qps: 3
+  timeout: 45
+  cache_ttl_hours: 24
+
+# 异步任务配置
+TASK_CONF:
+  redis_host: "127.0.0.1"
+  redis_port: 6379
+  queue_name: "stock_task"
+
+# 灰度开关（true=启用新功能，false=回退到原有逻辑）
+SWITCH:
+  enable_data_adapter: true
+  enable_data_clean: true
+  enable_llm_cache: true
+  enable_llm_truncate: true
+  enable_async_task: false   # 需 Redis，个人服务器按需开启
+  enable_system_monitor: true
+  enable_pydantic_validate: true
+
+# 告警通知配置
+ALERT:
+  enable_wechat_notify: false
+  wechat_webhook_url: ""
+  enable_email_notify: false
+  smtp_host: ""
+  smtp_port: 465
+  alert_email: ""
