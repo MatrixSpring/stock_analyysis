@@ -64,7 +64,7 @@ def _run_single_model(model_name: str, _inputs: dict) -> dict:
 
 
 @router.post(
-    "/consensus",
+    "/forecast/multi-model-consensus",
     response_model=MultiConsensusResp,
     summary="多模型共识推演",
     description="接收模型权重配置，执行全部模型独立推演 → 分歧校验 → 权重融合，返回共识结果与完整过程日志。",

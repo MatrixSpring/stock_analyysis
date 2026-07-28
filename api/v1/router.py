@@ -20,7 +20,6 @@ from api.v1.endpoints import (
     backtest,
     dashboard,
     decision_signals,
-    forecast,
     health,
     history,
     intelligence,
@@ -110,12 +109,6 @@ router.include_router(
     intelligence.router,
     prefix="/intelligence",
     tags=["Intelligence"]
-)
-
-router.include_router(
-    forecast.router,
-    prefix="/forecast",
-    tags=["Forecast"]
 )
 
 router.include_router(
