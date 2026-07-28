@@ -62,6 +62,15 @@ try:
 except Exception as _gw_err:
     logging.getLogger("server").warning(f"[DSA] LegacyGateway 初始化跳过: {_gw_err}")
 
+# ---- 新增：启动系统监控（可选，通过 system_config.yaml 灰度开关控制）----
+
+try:
+    from core.system_monitor import start_monitoring
+    start_monitoring(interval_seconds=300)
+    logging.getLogger("server").info("[DSA] SystemMonitor 已启动 (间隔 300s)")
+except Exception as _mon_err:
+    logging.getLogger("server").debug(f"[DSA] SystemMonitor 跳过: {_mon_err}")
+
 # 导出 app 供 uvicorn 使用
 __all__ = ['app']
 

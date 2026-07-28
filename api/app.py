@@ -377,6 +377,22 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     
     app.include_router(api_v1_router, prefix="/api/v1")
     add_error_handlers(app)
+
+    # ---- 新增：系统监控 API（灰度开关控制）----
+    try:
+        from api.system.status_api import router as system_monitor_router
+        app.include_router(system_monitor_router)
+        logger.info("[App] SystemMonitor API 已注册: /api/system/*")
+    except Exception as _se:
+        logger.debug(f"[App] SystemMonitor API 跳过: {_se}")
+
+    # ---- 新增：全局异常拦截器 ----
+    try:
+        from utils.exception_handler import register_exception_handlers
+        register_exception_handlers(app)
+        logger.info("[App] 全局异常拦截器已注册")
+    except Exception as _ee:
+        logger.debug(f"[App] 异常拦截器跳过: {_ee}")
     
     # ============================================================
     # 根路由和健康检查
