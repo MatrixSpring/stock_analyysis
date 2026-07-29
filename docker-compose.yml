@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  web:
+    build: .
+    container_name: dsa-web
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config:/app/config
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Shanghai
+    command: uvicorn server:app --host 0.0.0.0 --port 8000
+
+  # Streamlit 工作台（可选）
+  streamlit:
+    build: .
+    container_name: dsa-streamlit
+    restart: unless-stopped
+    profiles: [full]
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    command: streamlit run pages/main_workspace.py --server.address=0.0.0.0 --server.port=8501
