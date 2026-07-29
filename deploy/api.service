@@ -1,0 +1,13 @@
+[Unit]
+Description=Stock Backend API Service
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/stock_backend
+ExecStart=/opt/stock_backend/venv/bin/python src/main.py
+Restart=on-failure
+RestartSec=10
+EnvironmentFile=/opt/stock_backend/.env
+
+[Install]
+WantedBy=multi-user.target

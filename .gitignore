@@ -1,6 +1,16 @@
+# 环境配置
+.env
+*.env.local
+
+# 数据库
+/data/*.db
+/data/*.db-journal
+
 # Python
 __pycache__/
-*.py[cod]
+*.pyc
+*.pyd
+.cache/
 *.egg-info/
 dist/
 build/
@@ -41,6 +51,12 @@ reports/*.html
 
 # Docker
 docker-compose.override.yml
+
+# 日志
+logs/*.log
+
+# 运行临时文件
+.streamlit/
 
 # Test cache
 .pytest_cache/

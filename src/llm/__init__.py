@@ -1,51 +1,26 @@
-"""LLM runtime helpers."""
+from src.llm.base_llm import BaseLLMClient
+from src.llm.doubao_client import doubao_llm
+from src.llm.deepseek_client import deepseek_llm
+from src.config.settings import settings
 
-from src.llm.backend_registry import (
-    AGENT_CAPABLE_BACKEND_IDS,
-    AUTO_AGENT_BACKEND_ID,
-    CLAUDE_CODE_CLI_BACKEND_ID,
-    CODEX_CLI_BACKEND_ID,
-    GENERATION_ONLY_BACKEND_IDS,
-    LOCAL_CLI_GENERATION_BACKEND_IDS,
-    LITELLM_BACKEND_ID,
-    OPENCODE_CLI_BACKEND_ID,
-    SUPPORTED_AGENT_GENERATION_BACKENDS,
-    SUPPORTED_AGENT_UI_BACKENDS,
-    SUPPORTED_GENERATION_FALLBACK_BACKENDS,
-    SUPPORTED_GENERATION_BACKENDS,
-    resolve_agent_generation_backend_id,
-    resolve_generation_backend_id,
-    resolve_generation_fallback_backend_id,
-)
-from src.llm.generation_backend import (
-    GenerationBackend,
-    GenerationCapabilities,
-    GenerationError,
-    GenerationErrorCode,
-    GenerationResult,
-)
-from src.llm.litellm_backend import LiteLLMGenerationBackend
 
-__all__ = [
-    "AUTO_AGENT_BACKEND_ID",
-    "AGENT_CAPABLE_BACKEND_IDS",
-    "CLAUDE_CODE_CLI_BACKEND_ID",
-    "CODEX_CLI_BACKEND_ID",
-    "GENERATION_ONLY_BACKEND_IDS",
-    "GenerationBackend",
-    "GenerationCapabilities",
-    "GenerationError",
-    "GenerationErrorCode",
-    "GenerationResult",
-    "LOCAL_CLI_GENERATION_BACKEND_IDS",
-    "LITELLM_BACKEND_ID",
-    "LiteLLMGenerationBackend",
-    "OPENCODE_CLI_BACKEND_ID",
-    "SUPPORTED_AGENT_GENERATION_BACKENDS",
-    "SUPPORTED_AGENT_UI_BACKENDS",
-    "SUPPORTED_GENERATION_FALLBACK_BACKENDS",
-    "SUPPORTED_GENERATION_BACKENDS",
-    "resolve_agent_generation_backend_id",
-    "resolve_generation_backend_id",
-    "resolve_generation_fallback_backend_id",
-]
+class LLMFactory:
+    @staticmethod
+    def get_client(model_type: str = "doubao") -> BaseLLMClient:
+        """
+        model_type: doubao / deepseek
+        """
+        match model_type.lower():
+            case "doubao":
+                return doubao_llm
+            case "deepseek":
+                return deepseek_llm
+            case _:
+                raise ValueError(f"不支持的模型类型 {model_type}")
+
+
+# 全局默认实例
+llm_client = LLMFactory.get_client("doubao")
+
+
+__all__ = ["BaseLLMClient", "LLMFactory", "llm_client", "doubao_llm", "deepseek_llm"]

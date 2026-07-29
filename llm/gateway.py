@@ -34,7 +34,23 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from core.utils import clean_llm_json, retry
+# 懒加载避免循环导入 (llm → core.utils → core.event_analyzer → llm)
+_clean_llm_json = None
+_retry = None
+
+def _get_clean_llm_json():
+    global _clean_llm_json
+    if _clean_llm_json is None:
+        from core.utils import clean_llm_json as fn
+        _clean_llm_json = fn
+    return _clean_llm_json
+
+def _get_retry():
+    global _retry
+    if _retry is None:
+        from core.utils import retry as fn
+        _retry = fn
+    return _retry
 
 logger = logging.getLogger(__name__)
 
@@ -183,13 +199,54 @@ class LLMGateway:
         provider = ModelProvider.DEEPSEEK if professional else ModelProvider.DOUBAO
         return self._call_llm(provider, message, json.dumps(context, ensure_ascii=False), task="chat")
 
+    # ---- 新增：代码审查 ----
+
+    def review_code(self, file_path: str, code: str) -> LLMResult:
+        """AI 代码审查 — 检查逻辑漏洞、SQL 性能、安全性"""
+        provider = ModelProvider.DOUBAO
+        system_prompt = _load_prompt("code_review") + self.JSON_FORCE_SUFFIX
+        user_prompt = f"文件路径：{file_path}\n\n代码内容：\n{code}"
+        return self._call_llm(provider, system_prompt, user_prompt, task="code_review")
+
+    # ---- 新增：K 线解读 ----
+
+    def analyze_kline(self, stock_name: str, stock_code: str, kline_data: Dict) -> LLMResult:
+        """K 线技术分析 — AI 解读技术指标"""
+        provider = self.route_task(TaskType.STOCK_DIAGNOSE, str(kline_data))
+        system_prompt = _load_prompt("kline_analysis") + self.JSON_FORCE_SUFFIX
+        user_prompt = (
+            f"标的：{stock_name}({stock_code})\n"
+            f"K线数据：\n{json.dumps(kline_data, ensure_ascii=False)}"
+        )
+        return self._call_llm(provider, system_prompt, user_prompt, task="kline_analysis")
+
+    # ---- 新增：自然语言选股 ----
+
+    def screen_stocks(self, query: str) -> LLMResult:
+        """自然语言选股 — 中文描述 → 量化筛选条件"""
+        provider = ModelProvider.DOUBAO
+        system_prompt = _load_prompt("stock_screening") + self.JSON_FORCE_SUFFIX
+        user_prompt = f"选股需求：{query}"
+        return self._call_llm(provider, system_prompt, user_prompt, task="stock_screening")
+
     # ---- 底层调用 ----
 
-    @retry(max_attempts=2, delay_seconds=1.0, on_failure="return_none")
     def _call_llm(
         self, provider: ModelProvider, system_prompt: str, user_prompt: str, task: str = ""
     ) -> LLMResult:
-        """底层 LLM 调用封装"""
+        """底层 LLM 调用封装（带重试）"""
+        for attempt in range(2):
+            result = self._call_llm_once(provider, system_prompt, user_prompt, task)
+            if result.success:
+                return result
+            if attempt < 1:
+                time.sleep(1.0)
+        return result
+
+    def _call_llm_once(
+        self, provider: ModelProvider, system_prompt: str, user_prompt: str, task: str = ""
+    ) -> LLMResult:
+        """单次 LLM 调用"""
         t0 = time.time()
 
         if provider == ModelProvider.DEEPSEEK:
@@ -203,8 +260,9 @@ class LLMGateway:
             return result
 
         # JSON 清洗
-        if task in ("news_analysis", "chain_simulation", "stock_diagnose", "audit_revise"):
-            parsed = clean_llm_json(result.raw_text or "")
+        json_tasks = {"news_analysis", "chain_simulation", "stock_diagnose", "audit_revise", "code_review", "kline_analysis", "stock_screening"}
+        if task in json_tasks:
+            parsed = _get_clean_llm_json()(result.raw_text or "")
             if parsed is None:
                 logger.warning(f"[LLMGateway] {task} JSON 解析失败，原始输出: {result.raw_text[:200]}")
                 return LLMResult(
@@ -252,13 +310,14 @@ class LLMGateway:
     def _call_doubao(self, system_prompt: str, user_prompt: str) -> LLMResult:
         """调用豆包 API（火山引擎 ARK）"""
         api_key = os.getenv("ARK_API_KEY", "")
+        ark_model = os.getenv("ARK_MODEL", "")
         if not api_key:
             return LLMResult(success=False, error="未配置 ARK_API_KEY")
 
         try:
             import litellm
             response = litellm.completion(
-                model="ark/doubao-seed-code",
+                model=f"openai/{ark_model}",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
@@ -273,7 +332,7 @@ class LLMGateway:
             return LLMResult(
                 success=True,
                 raw_text=content,
-                model_used="doubao-seed-code",
+                model_used=ark_model,
                 token_count=response.usage.total_tokens if response.usage else 0,
             )
         except Exception as e:

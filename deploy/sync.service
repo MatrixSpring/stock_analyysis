@@ -1,0 +1,13 @@
+[Unit]
+Description=Stock Daily Sync Task
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/stock_backend
+ExecStart=/opt/stock_backend/venv/bin/python scripts/sync_daily_task.py --mode cron
+Restart=on-failure
+RestartSec=30
+EnvironmentFile=/opt/stock_backend/.env
+
+[Install]
+WantedBy=multi-user.target

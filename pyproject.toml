@@ -1,3 +1,30 @@
+[project]
+name = "stock_analysis"
+version = "0.1.0"
+description = "A股量化分析平台，渐进式重构项目"
+requires-python = ">=3.10,<3.12"
+dependencies = [
+    "pandas>=2.0",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "fastapi>=0.109.0",
+    "uvicorn>=0.27.0",
+    "plotly>=5.22.0",
+    "akshare>=1.14.0",
+    "pydantic>=2.5",
+]
+
+[project.optional-dependencies]
+# OLD_ENTRY旧代码临时运行才需要
+legacy_ui = [
+    "streamlit>=1.36.0"
+]
+dev = [
+    "pytest>=7.4.0",
+    "black",
+    "isort"
+]
+
 [tool.black]
 line-length = 120
 target-version = ['py310', 'py311', 'py312']
