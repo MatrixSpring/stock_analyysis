@@ -386,6 +386,14 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     except Exception as _se:
         logger.debug(f"[App] SystemMonitor API 跳过: {_se}")
 
+    # ---- 新增：SSE 实时推送 ----
+    try:
+        from core.sse_server import create_sse_router
+        app.include_router(create_sse_router())
+        logger.info("[App] SSE 流式推送已注册: /api/sse/*")
+    except Exception as _sse:
+        logger.debug(f"[App] SSE 跳过: {_sse}")
+
     # ---- 新增：全局异常拦截器 ----
     try:
         from utils.exception_handler import register_exception_handlers

@@ -1,0 +1,57 @@
+name: CI Test Suite
+
+on:
+  push:
+    branches: [main, feat/*]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pyyaml
+
+      - name: Run core module tests
+        run: python -m pytest tests/test_core_modules.py -v --tb=short
+
+      - name: Syntax check new modules
+        run: |
+          python -m py_compile core/__init__.py
+          python -m py_compile core/data_adapter.py
+          python -m py_compile core/data_cleaner.py
+          python -m py_compile core/llm_engine.py
+          python -m py_compile core/quant_score.py
+          python -m py_compile core/stock_selector.py
+          python -m py_compile core/global_state.py
+          python -m py_compile core/message_bus.py
+          python -m py_compile core/chain_simulation.py
+          python -m py_compile core/event_analyzer.py
+          python -m py_compile core/storage.py
+          python -m py_compile core/system_monitor.py
+          python -m py_compile core/task_queue.py
+          python -m py_compile core/sse_server.py
+          python -m py_compile core/backtest/engine.py
+          python -m py_compile core/backtest/metrics.py
+          python -m py_compile utils/time_utils.py
+          python -m py_compile utils/exception_handler.py
+          echo "All modules compiled successfully"
